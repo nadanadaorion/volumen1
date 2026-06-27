@@ -1,0 +1,87 @@
+{
+  "audioCover": "media/audio_cover.jpg",
+  "pages": [
+    {
+      "src": "pages/portada.jpg",
+      "hard": true,
+      "hotspots": []
+    },
+    {
+      "src": "pages/p2.jpg",
+      "hotspots": [
+        {
+          "tipo": "video",
+          "src": "media/demo_video.mp4",
+          "x": 18,
+          "y": 22,
+          "w": 64,
+          "h": 34,
+          "titulo": "Mi reel visual",
+          "subtitulo": "Producción audiovisual"
+        }
+      ]
+    },
+    {
+      "src": "pages/p3.jpg",
+      "hotspots": [
+        {
+          "tipo": "audio",
+          "src": "media/demo_audio.mp3",
+          "x": 25,
+          "y": 60,
+          "w": 50,
+          "h": 14,
+          "titulo": "Demo instrumental",
+          "subtitulo": "Producción musical"
+        }
+      ]
+    },
+    {
+      "src": "pages/p4.jpg",
+      "hotspots": [
+        {
+          "tipo": "imagen",
+          "src": "media/demo_imagen.jpg",
+          "x": 20,
+          "y": 25,
+          "w": 60,
+          "h": 40,
+          "titulo": "Pieza gráfica",
+          "subtitulo": "Diseño"
+        }
+      ]
+    },
+    {
+      "src": "pages/p5.jpg",
+      "hotspots": []
+    },
+    {
+      "src": "pages/p6.jpg",
+      "hotspots": [
+        {
+          "tipo": "video",
+          "src": "media/demo_video.mp4",
+          "x": 30,
+          "y": 30,
+          "w": 40,
+          "h": 30,
+          "titulo": "Segundo clip",
+          "subtitulo": "Motion"
+        }
+      ]
+    },
+    {
+      "src": "pages/p7.jpg",
+      "hotspots": []
+    },
+    {
+      "src": "pages/contraportada.jpg",
+      "hard": true,
+      "hotspots": []
+    }
+  ],
+  "background": {
+    "tipo": "color",
+    "valor": "#1a1a22"
+  }
+}
