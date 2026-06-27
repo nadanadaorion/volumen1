@@ -23,7 +23,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ori♡n</title>
+<title>Portafolio · Revista</title>
 <style>
   /* =====================================================================
      TOKENS DE TEMA  ·  Edita SOLO esta sección para cambiar la apariencia.
@@ -214,6 +214,8 @@
   .ipod .seekrow input[type=range]{
     -webkit-appearance:none; appearance:none; flex:1; height:7px;
     border-radius:4px; background:transparent; outline:none; cursor:pointer;
+    touch-action:none;            /* el slider maneja el arrastre táctil, no el navegador */
+    position:relative; z-index:3; /* por encima del relleno y la pista */
   }
   .ipod .seekrow input[type=range]::-webkit-slider-thumb{
     -webkit-appearance:none; width:15px; height:15px; border-radius:50%;
@@ -272,6 +274,14 @@
     .ipod.image .imgcanvas{ height:46vh; }
     .ipod .topbar{ cursor:default; }     /* no arrastrar en móvil */
     .ipod .controls{ flex-wrap:wrap; gap:10px; }
+    /* Slider de tiempo: zona táctil más grande y fácil de agarrar en móvil */
+    .ipod .seekrow{ padding-top:12px; padding-bottom:14px; }
+    .ipod .seekrow .barwrap{ height:24px; display:flex; align-items:center; }
+    .ipod .seekrow input[type=range]{ height:24px; }
+    .ipod .seekrow input[type=range]::-webkit-slider-thumb{ width:22px; height:22px; }
+    .ipod .seekrow input[type=range]::-moz-range-thumb{ width:22px; height:22px; }
+    .ipod .seekrow .barwrap .track,
+    .ipod .seekrow .fill{ top:50%; transform:translateY(-50%); }
     /* Móvil: solo sombra proyectada ligera; sin lomo ni curvatura */
     #book{ box-shadow: 0 10px 24px rgba(0,0,0,.4) !important; }
     .page-fx{ display:none !important; }
