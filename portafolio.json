@@ -2,76 +2,43 @@
   "audioCover": "media/audio_cover.jpg",
   "pages": [
     {
-      "src": "pages/portada.jpg",
+      "src": "pages/p_1.webp",
       "hard": true,
       "hotspots": []
     },
     {
-      "src": "pages/p2.jpg",
-      "hotspots": [
-        {
-          "tipo": "video",
-          "src": "media/demo_video.mp4",
-          "x": 18,
-          "y": 22,
-          "w": 64,
-          "h": 34,
-          "titulo": "Mi reel visual",
-          "subtitulo": "Producción audiovisual"
-        }
-      ]
-    },
-    {
-      "src": "pages/p3.jpg",
-      "hotspots": [
-        {
-          "tipo": "audio",
-          "src": "media/demo_audio.mp3",
-          "x": 25,
-          "y": 60,
-          "w": 50,
-          "h": 14,
-          "titulo": "Demo instrumental",
-          "subtitulo": "Producción musical"
-        }
-      ]
-    },
-    {
-      "src": "pages/p4.jpg",
-      "hotspots": [
-        {
-          "tipo": "imagen",
-          "src": "media/demo_imagen.jpg",
-          "x": 20,
-          "y": 25,
-          "w": 60,
-          "h": 40,
-          "titulo": "Pieza gráfica",
-          "subtitulo": "Diseño"
-        }
-      ]
-    },
-    {
-      "src": "pages/p5.jpg",
+      "src": "pages/p_2.webp",
       "hotspots": []
     },
     {
-      "src": "pages/p6.jpg",
+      "src": "pages/p_3.webp",
+      "hotspots": []
+    },
+    {
+      "src": "pages/p_4.webp",
+      "hotspots": []
+    },
+    {
+      "src": "pages/p_5.webp",
       "hotspots": [
         {
-          "tipo": "video",
-          "src": "media/demo_video.mp4",
-          "x": 30,
-          "y": 30,
-          "w": 40,
-          "h": 30,
-          "titulo": "Segundo clip",
-          "subtitulo": "Motion"
+          "tipo": "audio",
+          "src": "media/ASI SE SIENTE PERDER M&M_3.mp3",
+          "x": 17.4,
+          "y": 15.7,
+          "w": 65.9,
+          "h": 15,
+          "titulo": "ASÍ SE SIENTE PERDER",
+          "subtitulo": "ATLAZZZ - BIG CHALE"
         }
       ]
     },
     {
-      "src": "pages/p7.jpg",
+      "src": "pages/p_6.webp",
+      "hotspots": []
+    },
+    {
+      "src": "pages/p_7.webp",
       "hotspots": []
     },
     {
@@ -82,6 +49,6 @@
   ],
   "background": {
     "tipo": "color",
-    "valor": "#1a1a22"
+    "valor": "#7F7F7F"
   }
 }
