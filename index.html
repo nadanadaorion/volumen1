@@ -778,8 +778,15 @@
         if(hsEl){ dlog('  -> hotspot'); return; }
         if(flipping){ dlog('  -> flipping, ignora'); return; }
         const derecha = t1.clientX > W/2;
-        if(derecha){ dlog('  -> NEXT'); pageFlip.flipNext(); }
-        else { dlog('  -> PREV idx='+pageFlip.getCurrentPageIndex()); pageFlip.flipPrev(); }
+        const idx = pageFlip.getCurrentPageIndex();
+        const total = pageFlip.getPageCount();
+        if(derecha){
+          if(idx < total-1){ dlog('  -> NEXT a '+(idx+1)); pageFlip.flip(idx+1); }
+          else dlog('  -> ya en última');
+        } else {
+          if(idx > 0){ dlog('  -> PREV a '+(idx-1)); pageFlip.flip(idx-1); }
+          else dlog('  -> ya en portada');
+        }
       });
     }
     reportState();
