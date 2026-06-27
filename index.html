@@ -769,15 +769,17 @@
         if(mz>1) return;                       // con zoom, el toque es para pan
         const t1=e.changedTouches[0];
         const moved=Math.hypot(t1.clientX-gsx, t1.clientY-gsy);
-        if(moved>=40 || Date.now()-gt>=600){ dlog('GTAP no-tap moved='+moved.toFixed(0)); return; }
+        const W=window.innerWidth;
+        dlog('GTAP[v3] x='+Math.round(t1.clientX)+'/'+W+' moved='+moved.toFixed(0));
+        if(moved>=40 || Date.now()-gt>=600){ dlog('  no-tap'); return; }
         // ¿hotspot bajo el dedo? darle prioridad
         const under=document.elementFromPoint(t1.clientX,t1.clientY);
         const hsEl=under&&under.closest?under.closest('.hotspot'):null;
-        if(hsEl){ dlog('GTAP -> hotspot'); return; }   // el hotspot ya se activa solo
-        if(flipping){ dlog('GTAP flipping, ignora'); return; }
-        const derecha = t1.clientX > window.innerWidth/2;
-        dlog('GTAP -> '+(derecha?'NEXT':'PREV'));
-        if(derecha) pageFlip.flipNext(); else pageFlip.flipPrev();
+        if(hsEl){ dlog('  -> hotspot'); return; }
+        if(flipping){ dlog('  -> flipping, ignora'); return; }
+        const derecha = t1.clientX > W/2;
+        if(derecha){ dlog('  -> NEXT'); pageFlip.flipNext(); }
+        else { dlog('  -> PREV idx='+pageFlip.getCurrentPageIndex()); pageFlip.flipPrev(); }
       });
     }
     reportState();
