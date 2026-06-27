@@ -279,7 +279,7 @@
     .tapzone{ display:block; }
   }
   .tapzone{
-    display:none; position:fixed; top:0; bottom:0; width:16%; max-width:110px; z-index:40;
+    display:none; position:fixed; top:0; bottom:0; width:50%; z-index:30;
     -webkit-tap-highlight-color:transparent;
   }
   .tapzone.left{ left:0; }
@@ -463,8 +463,11 @@
       maxShadowOpacity:0.5,showCover:true,
       mobileScrollSupport:false,
       usePortrait:isMobile,                 // una sola página en móvil
-      flippingTime:700,useMouseEvents:true,drawShadow:true,
-      swipeDistance:isMobile?15:30,         // swipe más sensible en móvil
+      flippingTime:700,drawShadow:true,
+      // En móvil: la librería NO maneja gestos (los controlamos nosotros con tap).
+      // En escritorio: mantiene el arrastre de esquina natural.
+      useMouseEvents:!isMobile,
+      swipeDistance:30,
       disableFlipByClick:true, clickEventForward:true
     });
 
@@ -674,6 +677,13 @@
       zoomLayer.style.transform = mz===1 ? '' : `translate(${mx}px,${my}px) scale(${mz})`;
       // mientras hay zoom, el libro no debe pasar página por gesto (escritorio Y móvil)
       bookEl.style.pointerEvents = (mz>1) ? 'none' : '';
+      // en móvil, desactivar las zonas de tap mientras hay zoom (para poder hacer pan)
+      if(isMobile){
+        const pe = (mz>1) ? 'none' : '';
+        const tl=document.getElementById('tapLeft'), tr=document.getElementById('tapRight');
+        if(tl) tl.style.pointerEvents=pe;
+        if(tr) tr.style.pointerEvents=pe;
+      }
       reportState();
     }
     function reportState(){
@@ -757,39 +767,38 @@
         reportState();
       }
     });
-    // doble tap: alterna zoom en móvil (acerca a 2x o vuelve a 1x)
-    let lastTap=0;
-    bookEl.addEventListener('touchend',(e)=>{
-      if(!isMobile||mediaOpen) return;
-      const now=Date.now();
-      if(now-lastTap<300){
-        mz = mz>1 ? 1 : 2; mx=0; my=0; applyMagZoom();
-        e.preventDefault();
-      }
-      lastTap=now;
-    });
+    // (En móvil el zoom es solo por pinch; el tap simple se reserva para pasar página.)
 
     // ZONAS DE TOQUE (móvil): tap en borde derecho = avanzar, izquierdo = retroceder.
     // Solo actúan sin zoom y sin reproductor abierto. Un tap rápido (no swipe).
     function setupTapZone(el, dir){
-      let sx=0, sy=0, t=0;
-      el.addEventListener('touchstart',(e)=>{ const t0=e.touches[0]; sx=t0.clientX; sy=t0.clientY; t=Date.now(); dlog('tapzone '+(dir>0?'DER':'IZQ')+' touchstart'); },{passive:true});
+      let sx=0, sy=0, t=0, multi=false;
+      el.addEventListener('touchstart',(e)=>{
+        if(e.touches.length>1){ multi=true; return; }   // pinch: no es tap de página
+        multi=false;
+        const t0=e.touches[0]; sx=t0.clientX; sy=t0.clientY; t=Date.now();
+        dlog('tapzone '+(dir>0?'DER':'IZQ')+' touchstart');
+      },{passive:true});
       el.addEventListener('touchend',(e)=>{
+        if(multi){ multi=false; return; }               // hubo pinch, ignorar
+        if(e.touches.length>0) return;                  // aún quedan dedos
         const t1=e.changedTouches[0];
         const moved=Math.hypot(t1.clientX-sx, t1.clientY-sy);
-        const quick=Date.now()-t < 400;
-        dlog('tapzone '+(dir>0?'DER':'IZQ')+' touchend moved='+moved.toFixed(0)+' quick='+quick+' | flipping='+flipping+' mz='+Number(mz).toFixed(1)+' mediaOpen='+mediaOpen);
-        if(!isMobile||mediaOpen||mz>1||flipping){ dlog('  -> BLOQUEADO (cond)'); return; }
-        if(moved<20 && quick){
+        const quick=Date.now()-t < 500;
+        dlog('tapzone '+(dir>0?'DER':'IZQ')+' end moved='+moved.toFixed(0)+' | flipping='+flipping+' mz='+Number(mz).toFixed(1));
+        if(!isMobile||mediaOpen||mz>1){ dlog('  -> BLOQUEADO'); return; }
+        if(flipping){ dlog('  -> flipping, ignorado'); return; }
+        if(moved<35 && quick){                          // tolerancia amplia para un tap real
           e.preventDefault();
+          // ¿hay un hotspot bajo el dedo? darle prioridad
           el.style.pointerEvents='none';
           const under=document.elementFromPoint(t1.clientX,t1.clientY);
           el.style.pointerEvents='';
           const hsEl=under&&under.closest?under.closest('.hotspot'):null;
-          if(hsEl){ dlog('  -> hotspot debajo, activando'); hsEl.dispatchEvent(new MouseEvent('click',{bubbles:true})); return; }
+          if(hsEl){ dlog('  -> hotspot, activando'); hsEl.dispatchEvent(new MouseEvent('click',{bubbles:true})); return; }
           dlog('  -> flip '+(dir>0?'NEXT':'PREV'));
           if(dir>0) pageFlip.flipNext(); else pageFlip.flipPrev();
-        } else { dlog('  -> no fue tap (swipe largo o lento)'); }
+        } else { dlog('  -> no fue tap'); }
       });
     }
     setupTapZone(document.getElementById('tapRight'), +1);
