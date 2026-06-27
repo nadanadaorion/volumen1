@@ -279,6 +279,7 @@
 </style>
 </head>
 <body>
+  <div id="navdbg" style="position:fixed;top:4px;left:4px;z-index:99997;background:rgba(0,0,0,.6);color:#7CFC9A;font:11px monospace;padding:3px 7px;border-radius:4px;pointer-events:none"></div>
   <div id="zoomLayer"><div id="book"></div></div>
 
   <div id="errbox" style="display:none;position:fixed;inset:0;background:#1a1a22;color:#e6c878;font-family:monospace;padding:30px;z-index:99999;overflow:auto;white-space:pre-wrap;font-size:14px"></div>
@@ -747,10 +748,18 @@
         const derecha = t1.clientX > W/2;
         const idx = pageFlip.getCurrentPageIndex();
         const total = pageFlip.getPageCount();
+        var dbg=document.getElementById('navdbg');
         if(derecha){
-          if(idx < total-1){ pageFlip.flip(idx+1); }
+          if(idx < total-1){ pageFlip.flipNext(); if(dbg)dbg.textContent='NEXT desde '+idx; }
         } else {
-          if(idx > 0){ pageFlip.flip(idx-1); }
+          if(idx > 0){
+            // flipPrev no siempre responde en portrait; turnToPage es fiable
+            try{ pageFlip.flipPrev(); }catch(e){}
+            setTimeout(function(){
+              if(pageFlip.getCurrentPageIndex()===idx){ pageFlip.turnToPage(idx-1); if(dbg)dbg.textContent='PREV via turnToPage desde '+idx; }
+              else { if(dbg)dbg.textContent='PREV via flipPrev desde '+idx; }
+            },120);
+          }
         }
       });
     }
