@@ -1,0 +1,54 @@
+{
+  "audioCover": "media/audio_cover.jpg",
+  "pages": [
+    {
+      "src": "pages/p_1.webp",
+      "hard": true,
+      "hotspots": []
+    },
+    {
+      "src": "pages/p_2.webp",
+      "hotspots": []
+    },
+    {
+      "src": "pages/p_3.webp",
+      "hotspots": []
+    },
+    {
+      "src": "pages/p_4.webp",
+      "hotspots": []
+    },
+    {
+      "src": "pages/p_5.webp",
+      "hotspots": [
+        {
+          "tipo": "audio",
+          "src": "media/ASI SE SIENTE PERDER M&M_3.mp3",
+          "x": 17.4,
+          "y": 15.7,
+          "w": 65.9,
+          "h": 15,
+          "titulo": "ASÍ SE SIENTE PERDER",
+          "subtitulo": "ATLAZZZ - BIG CHALE"
+        }
+      ]
+    },
+    {
+      "src": "pages/p_6.webp",
+      "hotspots": []
+    },
+    {
+      "src": "pages/p_7.webp",
+      "hotspots": []
+    },
+    {
+      "src": "pages/contraportada.jpg",
+      "hard": true,
+      "hotspots": []
+    }
+  ],
+  "background": {
+    "tipo": "color",
+    "valor": "#7F7F7F"
+  }
+}
