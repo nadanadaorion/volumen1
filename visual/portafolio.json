@@ -1,0 +1,94 @@
+{
+  "audioCover": "media/audio_cover.jpg",
+  "pages": [
+    {
+      "src": "pages/P_1.webp",
+      "hard": true,
+      "hotspots": []
+    },
+    {
+      "src": "pages/P_2.webp",
+      "hotspots": []
+    },
+    {
+      "src": "pages/P_3.webp",
+      "hotspots": []
+    },
+    {
+      "src": "pages/P_6.webp",
+      "hotspots": [
+        {
+          "tipo": "video",
+          "src": "media/NANANINA_CUM.webm",
+          "x": 8.5,
+          "y": 9.4,
+          "w": 26.4,
+          "h": 18.2,
+          "titulo": "NANANINA CUMPLEAÑOS",
+          "subtitulo": "instagram story"
+        },
+        {
+          "tipo": "imagen",
+          "src": "media/CROMA GENERO.webp",
+          "x": 5.8,
+          "y": 48.7,
+          "w": 26.6,
+          "h": 23.5,
+          "titulo": "CROMA FLYER 1",
+          "subtitulo": ""
+        },
+        {
+          "tipo": "imagen",
+          "src": "media/CROMA GENERO_INVERTED.webp",
+          "x": 37.1,
+          "y": 48.4,
+          "w": 27.4,
+          "h": 23.5,
+          "titulo": "CROMA FLYER 2",
+          "subtitulo": ""
+        },
+        {
+          "tipo": "imagen",
+          "src": "media/CROMA GENERO_BW.webp",
+          "x": 4.7,
+          "y": 72.9,
+          "w": 28.1,
+          "h": 23.1,
+          "titulo": "CROMA FLYER 3",
+          "subtitulo": ""
+        },
+        {
+          "tipo": "imagen",
+          "src": "media/CROMA GENERO_WB.webp",
+          "x": 37.6,
+          "y": 72.6,
+          "w": 27,
+          "h": 23.5,
+          "titulo": "CROMA FLYER 4",
+          "subtitulo": ""
+        }
+      ]
+    },
+    {
+      "src": "pages/P_7.webp",
+      "hotspots": []
+    },
+    {
+      "src": "pages/P_10.webp",
+      "hotspots": []
+    },
+    {
+      "src": "pages/P_11.webp",
+      "hotspots": []
+    },
+    {
+      "src": "pages/P_14.webp",
+      "hard": true,
+      "hotspots": []
+    }
+  ],
+  "background": {
+    "tipo": "color",
+    "valor": "#C0C0C0"
+  }
+}

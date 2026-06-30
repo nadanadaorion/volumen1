@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  PORTAFOLIO · REVISTA INTERACTIVA
+  ============================================================================
+  Estructura del proyecto:
+    /index.html                  este archivo (el VISOR)
+    /lib/page-flip.browser.js    motor de paso de página (no editar)
+    /pages/                      imágenes de las páginas (A4, 1191x1684)
+    /media/                      videos, audios, imágenes y carátula de audio
+
+  CÓMO CAMBIAR EL LOOK DE LOS REPRODUCTORES:
+    Edita únicamente los TOKENS DE TEMA en el bloque :root (más abajo).
+    Todos los colores, tamaños y fuentes de los reproductores salen de ahí.
+    No hace falta tocar las reglas .ipod ni el JavaScript.
+
+  CÓMO CAMBIAR EL CONTENIDO (páginas, medios, hotspots):
+    Edita el objeto DATA en el <script> (o, mejor, usa el editor de la Fase 3,
+    que genera este mismo objeto como JSON).
+  ============================================================================
+-->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ori♡n - Musica</title>
+<style>
+  /* =====================================================================
+     TOKENS DE TEMA  ·  Edita SOLO esta sección para cambiar la apariencia.
+     ---------------------------------------------------------------------
+     Fondo de la escena y acento general:
+  ===================================================================== */
+  :root{
+    --bg:#15151c;
+    --accent:#e6c878;
+
+    /* ---------- REPRODUCTOR (audio / video / imagen) ----------
+       Cambia estos valores para rediseñar el look de los tres reproductores.
+       Están agrupados por función para que sea fácil de seguir.        */
+
+    /* Tarjeta (contenedor) */
+    --pl-width: 430px;                 /* ancho del reproductor */
+    --pl-radius: 12px;                 /* redondeo de esquinas */
+    --pl-bg: linear-gradient(#ffffff,#eef1f5);   /* fondo de la tarjeta */
+    --pl-border: 1px solid #c8ccd4;    /* borde de la tarjeta */
+    --pl-shadow: 0 22px 60px rgba(0,0,0,.45);    /* sombra de la tarjeta */
+    --pl-font: system-ui, sans-serif;  /* tipografía del reproductor */
+
+    /* Barra superior ("Now Playing") */
+    --pl-topbar-bg: linear-gradient(#fdfdfd,#e9edf2);
+    --pl-topbar-border: #d6dae1;
+    --pl-topbar-color: #333;
+    --pl-accent-blue: #2aa3ef;         /* icono play y acentos azules */
+
+    /* Carátula / área de medio */
+    --pl-art-size: 150px;              /* lado de la carátula de audio */
+    --pl-art-bg: #000;
+    --pl-art-radius: 4px;
+
+    /* Textos (título / subtítulo) */
+    --pl-title-size: 20px;
+    --pl-title-color: #111;
+    --pl-sub-size: 15px;
+    --pl-sub-color: #888;
+
+    /* Barra de progreso */
+    --pl-track-bg: #d7dbe2;            /* riel */
+    --pl-fill: linear-gradient(#5cc3ff,#1c95e8);  /* relleno reproducido */
+    --pl-thumb-bg: radial-gradient(circle at 35% 30%,#fff,#bcc3cc);
+    --pl-thumb-border: #8a929d;
+    --pl-time-color: #555;
+    --pl-time-color-rem: #999;         /* tiempo restante (derecha) */
+
+    /* Botonera inferior */
+    --pl-controls-bg: linear-gradient(#f6f8fb,#e9edf2);
+    --pl-controls-border: #e2e5ea;
+    --pl-btn-bg: linear-gradient(#ffffff,#dfe5ec);
+    --pl-btn-bg-hover: linear-gradient(#ffffff,#eaf0f7);
+    --pl-btn-bg-active: linear-gradient(#dfe5ec,#cfd6df);
+    --pl-btn-border: #c2c8d0;
+    --pl-btn-color: #33597a;
+    --pl-vol-accent: #1c95e8;
+
+    /* Visor de imagen */
+    --pl-imgcanvas-bg: #111;
+    --pl-imgcanvas-h: 360px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background: radial-gradient(circle at 50% 30%, #25252f, var(--bg));
+    font-family:system-ui,sans-serif;
+    display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+  }
+  #zoomLayer{ transition: transform .18s ease-out; will-change: transform; }
+  #book{
+    box-shadow:
+      0 18px 30px rgba(0,0,0,.35),
+      0 40px 80px rgba(0,0,0,.45);
+    transition: transform .55s cubic-bezier(.22,.61,.36,1);
+  }
+  /* En escritorio, cuando la revista está cerrada (portada sola), se centra
+     desplazándose media página a la derecha; al abrir vuelve a 0 con animación. */
+  #book.cover-centered{ transform: translateX(var(--cover-shift, 0px)); box-shadow:none; }
+  /* Ocultar la sombra de la "página fantasma" cuando portada/contraportada va sola */
+  #book.cover-centered .stf__outerShadow,
+  #book.cover-centered .stf__shadow{ display:none !important; opacity:0 !important; }
+  .stf__parent{ margin:0 auto; }
+  .page{ position:relative; background:#fff;width:100%;height:100%;overflow:hidden; }
+  .pageimg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; user-select:none; }
+  .page-hard{ background:#1c1c28; }
+
+  /* ---------- Efecto 3D de la revista (escritorio) ---------- */
+  /* Capa de sombras/luces SOBRE cada página. No captura clics (hotspots intactos). */
+  .page-fx{ position:absolute; inset:0; pointer-events:none; z-index:4; }
+  /* Punto 1 (lomo): degradado oscuro hacia el borde interno de cada hoja.
+     Punto 3 (curvatura): leve aclarado hacia el borde externo.
+     El lado se decide con la clase .left / .right que añade el JS. */
+  .page-fx.right{
+    background:
+      linear-gradient(to right,
+        rgba(0,0,0,.28) 0%, rgba(0,0,0,.10) 4%, rgba(0,0,0,0) 12%,
+        rgba(255,255,255,0) 78%, rgba(255,255,255,.06) 100%);
+  }
+  .page-fx.left{
+    background:
+      linear-gradient(to left,
+        rgba(0,0,0,.28) 0%, rgba(0,0,0,.10) 4%, rgba(0,0,0,0) 12%,
+        rgba(255,255,255,0) 78%, rgba(255,255,255,.06) 100%);
+  }
+  /* En portada/contraportada (hoja sola) no hay lomo: suaviza el efecto */
+  #book.cover-centered .page-fx{ opacity:.25; }
+
+  /* ---------- hotspots ---------- */
+  .hotspot{
+    position:absolute; cursor:pointer; border-radius:6px; z-index:5;
+    background:rgba(230,200,120,.0);
+    transition:background .2s, box-shadow .2s;
+  }
+  .hotspot:hover{
+    background:rgba(230,200,120,.18);
+    box-shadow:0 0 0 2px var(--accent), 0 0 25px rgba(230,200,120,.4);
+  }
+  .hotspot .badge{
+    position:absolute; top:6px; left:6px;
+    background:rgba(20,20,28,.8); color:var(--accent);
+    font-size:11px; padding:2px 7px; border-radius:4px;
+    opacity:0; transition:opacity .2s; pointer-events:none;
+  }
+  .hotspot:hover .badge{ opacity:1; }
+
+  /* ===================================================
+     REPRODUCTOR estilo iPod / "Now Playing"
+  =================================================== */
+  .ipod{
+    position:fixed; z-index:1000; display:none;
+    width:var(--pl-width);
+    background:var(--pl-bg);
+    border-radius:var(--pl-radius); overflow:hidden;
+    border:var(--pl-border);
+    box-shadow:var(--pl-shadow);
+    font-family:var(--pl-font);
+  }
+  .ipod.open{ display:block; }
+  .ipod .screen{ background:transparent; }
+
+  /* barra superior */
+  .ipod .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:9px 12px; font-size:13px; font-weight:600; color:var(--pl-topbar-color);
+    background:var(--pl-topbar-bg);
+    border-bottom:1px solid var(--pl-topbar-border); cursor:move; user-select:none;
+  }
+  .ipod .topbar .status{ display:flex; align-items:center; gap:6px; }
+  .ipod .topbar .playicon{ color:var(--pl-accent-blue); }
+  .ipod .topbar .batt{
+    width:26px; height:13px; border:1px solid #2a8f3a; border-radius:2px;
+    background:linear-gradient(#7be58c,#3fbf57); position:relative;
+  }
+  .ipod .topbar .batt::after{ content:""; position:absolute; right:-4px; top:3px; width:3px; height:7px; background:#2a8f3a; border-radius:0 1px 1px 0; }
+  .ipod .closex{
+    border:none; background:none; cursor:pointer; font-size:15px; color:#999;
+    line-height:1; padding:0 2px;
+  }
+  .ipod .closex:hover{ color:#333; }
+
+  /* cuerpo: carátula/medio + info */
+  .ipod .nowbody{ display:flex; gap:16px; padding:18px; align-items:center; }
+  .ipod .art{
+    width:var(--pl-art-size); height:var(--pl-art-size); flex:none; background:var(--pl-art-bg);
+    border-radius:var(--pl-art-radius); overflow:hidden;
+    box-shadow:0 2px 8px rgba(0,0,0,.25);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .ipod .art img, .ipod .art video{ width:100%; height:100%; object-fit:cover; display:block; }
+  /* el video NO se recorta: se ve completo, adaptándose a su proporción */
+  .ipod.video .art video{ object-fit:contain; background:#000; }
+  .ipod .info{ flex:1; min-width:0; }
+  .ipod .info .ttl{ font-size:var(--pl-title-size); font-weight:700; color:var(--pl-title-color); line-height:1.2; }
+  .ipod .info .sub{ font-size:var(--pl-sub-size); color:var(--pl-sub-color); margin-top:6px; }
+
+  /* video: ocupa el ancho; la proporción la fija el JS según el video real */
+  .ipod.video .nowbody{ flex-direction:column; gap:10px; padding:16px; align-items:stretch; }
+  .ipod.video .art{ width:100%; height:auto; aspect-ratio:16/9; max-height:70vh; }
+  .ipod.video .info{ text-align:center; }
+  .ipod.video .info .ttl{ font-size:17px; }
+  .ipod.video .info .sub{ font-size:13px; margin-top:2px; }
+
+  /* barra de progreso */
+  .ipod .seekrow{
+    display:flex; align-items:center; gap:10px;
+    padding:6px 18px 10px; font-size:12px; color:var(--pl-time-color);
+    font-variant-numeric:tabular-nums;
+  }
+  .ipod .seekrow input[type=range]{
+    -webkit-appearance:none; appearance:none; flex:1; height:7px;
+    border-radius:4px; background:transparent; outline:none; cursor:pointer;
+    touch-action:none;            /* el slider maneja el arrastre táctil, no el navegador */
+    position:relative; z-index:3; /* por encima del relleno y la pista */
+  }
+  .ipod .seekrow input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:15px; height:15px; border-radius:50%;
+    background:var(--pl-thumb-bg);
+    border:1px solid var(--pl-thumb-border); box-shadow:0 1px 2px rgba(0,0,0,.3);
+  }
+  .ipod .seekrow input[type=range]::-moz-range-thumb{
+    width:15px;height:15px;border-radius:50%;background:#fff;border:1px solid var(--pl-thumb-border);
+  }
+  .ipod .seekrow .barwrap{ flex:1; position:relative; height:7px; }
+  .ipod .seekrow .barwrap .track{ position:absolute; inset:0; border-radius:4px; background:var(--pl-track-bg); pointer-events:none; }
+  .ipod .seekrow .barwrap input{ position:absolute; inset:0; width:100%; z-index:4; }
+  .ipod .seekrow .fill{ position:absolute; left:0; top:0; height:7px; border-radius:4px;
+    background:var(--pl-fill); pointer-events:none; width:0%; }
+  .ipod .timeR{ color:var(--pl-time-color-rem); }
+
+  /* botonera inferior */
+  .ipod .controls{
+    display:flex; align-items:center; justify-content:center; gap:12px;
+    padding:10px 16px 16px;
+    border-top:1px solid var(--pl-controls-border);
+    background:var(--pl-controls-bg);
+  }
+  .ipod .controls button{
+    width:46px;height:32px;border-radius:8px;border:1px solid var(--pl-btn-border);
+    background:var(--pl-btn-bg); color:var(--pl-btn-color); cursor:pointer; font-size:14px;
+    box-shadow:0 1px 1px rgba(0,0,0,.08), inset 0 1px 0 #fff;
+  }
+  .ipod .controls button:hover{ background:var(--pl-btn-bg-hover); }
+  .ipod .controls button:active{ background:var(--pl-btn-bg-active); }
+  .ipod .controls .vol{ display:flex; align-items:center; gap:6px; color:#667; font-size:13px; margin-left:4px; }
+  .ipod .controls .vol input{ width:78px; accent-color:var(--pl-vol-accent); }
+
+  /* visor de imagen */
+  .ipod.image .nowbody{ padding:0; }
+  .ipod.image .imgcanvas{
+    width:100%; height:var(--pl-imgcanvas-h); background:var(--pl-imgcanvas-bg); overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .ipod.image .imgcanvas img{ transform-origin:center; transition:transform .12s ease-out; max-width:100%; max-height:100%; will-change:transform; }
+  .ipod.image .imgcanvas img:active{ transition:none; }
+
+  /* ============ RESPONSIVE (móvil) ============ */
+  @media (max-width: 820px){
+    /* reproductores: ancho casi completo, fijos arriba-centro, sin depender de arrastre */
+    .ipod{
+      width: calc(100vw - 24px) !important;
+      max-width: 460px;
+      left: 50% !important;
+      top: 12px !important;
+      transform: translateX(-50%);
+    }
+    .ipod .nowbody{ padding:14px; gap:12px; }
+    .ipod .art{ width:110px; height:110px; }
+    .ipod .info .ttl{ font-size:17px; }
+    .ipod .info .sub{ font-size:13px; }
+    .ipod.image .imgcanvas{ height:46vh; }
+    .ipod .topbar{ cursor:default; }     /* no arrastrar en móvil */
+    .ipod .controls{ flex-wrap:wrap; gap:10px; }
+    /* Slider de tiempo: zona táctil más grande y fácil de agarrar en móvil */
+    .ipod .seekrow{ padding-top:12px; padding-bottom:14px; }
+    .ipod .seekrow .barwrap{ height:24px; display:flex; align-items:center; }
+    .ipod .seekrow input[type=range]{ height:24px; }
+    .ipod .seekrow input[type=range]::-webkit-slider-thumb{ width:22px; height:22px; }
+    .ipod .seekrow input[type=range]::-moz-range-thumb{ width:22px; height:22px; }
+    .ipod .seekrow .barwrap .track,
+    .ipod .seekrow .fill{ top:50%; transform:translateY(-50%); }
+    /* Móvil: solo sombra proyectada ligera; sin lomo ni curvatura */
+    #book{ box-shadow: 0 10px 24px rgba(0,0,0,.4) !important; }
+    .page-fx{ display:none !important; }
+  }
+</style>
+</head>
+<body>
+  <div id="zoomLayer"><div id="book"></div></div>
+  <div id="seekdbg" style="display:none;position:fixed;left:0;right:0;bottom:0;max-height:32vh;overflow:auto;background:rgba(10,10,16,.92);color:#7CFC9A;font:11px/1.3 monospace;padding:6px 9px;z-index:99998;border-top:2px solid #2aa3ef"></div>
+  <script>
+  window.__SDBG = (location.search.indexOf('debug=1')>=0);
+  window.slog=function(m){ if(!window.__SDBG)return; var b=document.getElementById('seekdbg'); b.style.display='block'; var l=document.createElement('div'); l.textContent='• '+m; b.insertBefore(l,b.firstChild); while(b.childNodes.length>30)b.removeChild(b.lastChild); };
+  </script>
+
+  <div id="errbox" style="display:none;position:fixed;inset:0;background:#1a1a22;color:#e6c878;font-family:monospace;padding:30px;z-index:99999;overflow:auto;white-space:pre-wrap;font-size:14px"></div>
+
+  <script>
+  window.onerror=function(m,s,l,c,e){var b=document.getElementById('errbox');b.style.display='block';b.textContent='⚠ ERROR\n\n'+m+'\n'+s+'  L'+l+':'+c+'\n\n'+(e&&e.stack?e.stack:'');return false;};
+  </script>
+  <script src="lib/page-flip.browser.js"></script>
+
+  <!-- ===== Reproductor audio/video (iPod) ===== -->
+  <div class="ipod" id="player">
+    <div class="screen">
+      <div class="topbar" id="playerBar">
+        <span class="status"><span class="playicon">▶</span> Now Playing</span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <span class="batt"></span>
+          <button class="closex" data-close="player">✕</button>
+        </span>
+      </div>
+      <div class="nowbody">
+        <div class="art" id="playerArt"></div>
+        <div class="info">
+          <div class="ttl" id="playerTitle">—</div>
+          <div class="sub" id="playerSub"></div>
+        </div>
+      </div>
+      <div class="seekrow">
+        <span id="timeCur">0:00</span>
+        <div class="barwrap">
+          <div class="track"></div>
+          <div class="fill" id="seekFill"></div>
+          <input type="range" id="seek" min="0" max="100" step="0.1" value="0">
+        </div>
+        <span class="timeR" id="timeDur">-0:00</span>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="btnPlay">▶</button>
+      <button id="btnPause">⏸</button>
+      <button id="btnStop">⏹</button>
+      <span class="vol">🔊<input type="range" id="vol" min="0" max="1" step="0.01" value="1"></span>
+    </div>
+  </div>
+
+  <!-- ===== Visor de imagen (iPod) ===== -->
+  <div class="ipod image" id="viewer">
+    <div class="screen">
+      <div class="topbar" id="viewerBar">
+        <span class="status">🖼 <span id="viewerTitle">Imagen</span></span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <span class="batt"></span>
+          <button class="closex" data-close="viewer">✕</button>
+        </span>
+      </div>
+      <div class="nowbody">
+        <div class="imgcanvas"><img id="imgEl" src="" alt=""></div>
+      </div>
+      <div class="seekrow" id="viewerSub" style="justify-content:center;color:#888"></div>
+    </div>
+    <div class="controls">
+      <button id="zoomOut">−</button>
+      <button id="zoomReset">⟳</button>
+      <button id="zoomIn">+</button>
+      <span style="color:#bbb;font-size:12px" id="zoomLabel">100%</span>
+    </div>
+  </div>
+
+  <script>
+  /* =========================================================
+     El CONTENIDO se carga desde portafolio.json (generado por editor.html).
+     Si el JSON no se encuentra, se usa el contenido de respaldo de abajo.
+  ========================================================= */
+  const FALLBACK_DATA = {
+    audioCover: "media/audio_cover.jpg",
+    pages: [
+      { src:"pages/portada.jpg", hard:true, hotspots:[] },
+      { src:"pages/p2.jpg", hotspots:[
+        { tipo:"video", src:"media/demo_video.mp4", x:18,y:22,w:64,h:34, titulo:"Mi reel visual", subtitulo:"Producción audiovisual" }
+      ]},
+      { src:"pages/p3.jpg", hotspots:[
+        { tipo:"audio", src:"media/demo_audio.mp3", x:25,y:60,w:50,h:14, titulo:"Demo instrumental", subtitulo:"Producción musical" }
+      ]},
+      { src:"pages/p4.jpg", hotspots:[
+        { tipo:"imagen", src:"media/demo_imagen.jpg", x:20,y:25,w:60,h:40, titulo:"Pieza gráfica", subtitulo:"Diseño" }
+      ]},
+      { src:"pages/p5.jpg", hotspots:[] },
+      { src:"pages/p6.jpg", hotspots:[
+        { tipo:"video", src:"media/demo_video.mp4", x:30,y:30,w:40,h:30, titulo:"Segundo clip", subtitulo:"Motion" }
+      ]},
+      { src:"pages/p7.jpg", hotspots:[] },
+      { src:"pages/contraportada.jpg", hard:true, hotspots:[] }
+    ]
+  };
+
+  let DATA = FALLBACK_DATA;
+
+  // Carga portafolio.json y arranca. Si falla, usa el respaldo.
+  // Si viene de la vista previa del editor (?preview=1), usa sessionStorage.
+  function boot(){
+    if(location.search.indexOf('preview=1')>=0){
+      try{
+        const pv=sessionStorage.getItem('previewData');
+        if(pv){ DATA=JSON.parse(pv); start(); return; }
+      }catch(e){}
+    }
+    fetch('portafolio.json', {cache:'no-store'})
+      .then(r=>{ if(!r.ok) throw new Error('sin json'); return r.json(); })
+      .then(json=>{ DATA = json; start(); })
+      .catch(()=>{ DATA = FALLBACK_DATA; start(); });
+  }
+
+  function start(){
+   try {
+    if(typeof St==='undefined'||!St.PageFlip){ document.getElementById('errbox').style.display='block'; document.getElementById('errbox').textContent='La librería page-flip no se cargó.'; return; }
+
+    let flipping=false;
+    let mz=1, mx=0, my=0;   // zoom de la revista (escala y traslación)
+    const RATIO=1.414;
+    const bookEl=document.getElementById('book');
+
+    // Fondo personalizable: color (#hex / css) o imagen (ruta).
+    if(DATA.background){
+      const bg=DATA.background;
+      if(bg.tipo==='imagen' && bg.valor){
+        document.body.style.background='#15151c url("'+bg.valor+'") center/cover no-repeat fixed';
+      } else if(bg.tipo==='color' && bg.valor){
+        document.body.style.background=bg.valor;
+      }
+    }
+
+    // Detectar móvil: pantalla estrecha o dispositivo táctil vertical
+    const isMobile = window.matchMedia('(max-width: 820px)').matches;
+
+    let pageW, pageH;
+    if(isMobile){
+      // UNA página: ocupa casi todo el ancho disponible
+      const availW = Math.min(window.innerWidth - 20, 520);
+      const availH = window.innerHeight - 20;
+      pageW = availW;
+      pageH = Math.round(pageW * RATIO);
+      if(pageH > availH){ pageH = availH; pageW = Math.round(pageH / RATIO); }
+    } else {
+      // DOBLE página (escritorio)
+      const maxH = Math.min(window.innerHeight - 40, 760);
+      pageH = maxH;
+      pageW = Math.round(pageH / RATIO);
+    }
+
+    const pageFlip=new St.PageFlip(bookEl,{
+      width:pageW,height:pageH,size:"fixed",
+      minWidth:200,maxWidth:2000,minHeight:300,maxHeight:2400,
+      maxShadowOpacity:0.5,showCover:true,
+      mobileScrollSupport:false,
+      usePortrait:isMobile,                 // una sola página en móvil
+      flippingTime:700,drawShadow:true,
+      // En móvil: la librería NO maneja gestos (los controlamos nosotros con tap).
+      // En escritorio: mantiene el arrastre de esquina natural.
+      useMouseEvents:!isMobile,
+      swipeDistance:30,
+      disableFlipByClick:true, clickEventForward:true
+    });
+
+    const elements=DATA.pages.map((p,idx)=>{
+      const d=document.createElement('div');
+      d.className='page'+(p.hard?' page-hard':'');
+      if(p.hard) d.setAttribute('data-density','hard');
+      if(p.src){ const im=document.createElement('img'); im.src=p.src; im.className='pageimg'; im.draggable=false; d.appendChild(im); }
+      // Capa de efecto 3D (lomo + curvatura). Página par = derecha, impar = izquierda.
+      if(!isMobile){
+        const fx=document.createElement('div');
+        fx.className='page-fx '+(idx%2===0?'right':'left');
+        d.appendChild(fx);
+      }
+      (p.hotspots||[]).forEach(hs=>{
+        const z=document.createElement('div');
+        z.className='hotspot';
+        z.style.left=hs.x+'%'; z.style.top=hs.y+'%'; z.style.width=hs.w+'%'; z.style.height=hs.h+'%';
+        const icon=hs.tipo==='video'?'▶ Video':hs.tipo==='audio'?'♪ Audio':hs.tipo==='enlace'?'🔗 Enlace':'🖼 Imagen';
+        z.innerHTML='<span class="badge">'+icon+'</span>';
+        const fire=(ev)=>{
+          ev.stopPropagation(); 
+          if(flipping||mz>1){ return; }
+          if(hs.tipo==='enlace'){
+            if(hs.src) window.open(hs.src, '_blank', 'noopener');
+          } else {
+            openMedia(hs);
+          }
+        };
+        z.addEventListener('click', fire);
+        // Escritorio: evitar que el doblez (peel) se active al pasar el cursor
+        // sobre un hotspot. El peel se dispara con mousemove cerca de la esquina;
+        // mientras el cursor esté sobre el hotspot, "engañamos" a la librería
+        // enviándole un mousemove en el centro del libro (lejos de las esquinas),
+        // y bloqueamos el mousedown para que no inicie el arrastre.
+        if(!isMobile){
+          z.addEventListener('mousedown',(e)=>{ e.stopPropagation(); }, true);
+          const feedCenter=(e)=>{
+            if(e.__synthetic) return;
+            e.stopPropagation();
+            const r=bookEl.getBoundingClientRect();
+            const ev=new MouseEvent('mousemove',{
+              clientX:r.left+r.width/2, clientY:r.top+r.height/2, bubbles:true
+            });
+            ev.__synthetic=true;
+            bookEl.dispatchEvent(ev);
+          };
+          z.addEventListener('mouseenter', feedCenter, true);
+          z.addEventListener('mousemove', feedCenter, true);
+        }
+        // En móvil, un tap limpio sobre el hotspot lo activa de forma fiable
+        let hsx=0,hsy=0,ht=0;
+        z.addEventListener('touchstart',(e)=>{ const t=e.touches[0]; hsx=t.clientX; hsy=t.clientY; ht=Date.now(); e.stopPropagation(); },{passive:true});
+        z.addEventListener('touchend',(e)=>{
+          const t=e.changedTouches[0];
+          const moved=Math.hypot(t.clientX-hsx,t.clientY-hsy);
+          if(moved<18 && Date.now()-ht<400){ e.preventDefault(); fire(e); }
+        });
+        d.appendChild(z);
+      });
+      return d;
+    });
+    pageFlip.loadFromHTML(elements);
+
+    /* ---- Animación de apertura (solo escritorio): portada centrada ---- */
+    // Cuando la revista está cerrada en la portada, se desplaza media hoja a la
+    // derecha para quedar centrada. Al abrir, vuelve a su sitio con transición.
+    function updateCoverCentering(){
+      if(isMobile){ bookEl.classList.remove('cover-centered'); return; }
+      const idx = pageFlip.getCurrentPageIndex();
+      const total = pageFlip.getPageCount();
+      const onCover = idx===0;
+      const onBack  = idx===total-1;
+      if(onCover){
+        // portada sola a la derecha → mover el conjunto a la izquierda para centrarla
+        bookEl.style.setProperty('--cover-shift', (-pageW/2)+'px');
+        bookEl.classList.add('cover-centered');
+      } else if(onBack){
+        // contraportada sola a la izquierda → mover a la derecha para centrarla
+        bookEl.style.setProperty('--cover-shift', (pageW/2)+'px');
+        bookEl.classList.add('cover-centered');
+      } else {
+        bookEl.classList.remove('cover-centered');
+      }
+    }
+    // primer centrado sin animación (evita un salto al cargar)
+    bookEl.style.transition='none';
+    updateCoverCentering();
+    requestAnimationFrame(()=>{ bookEl.style.transition=''; });
+    pageFlip.on('flip', updateCoverCentering);
+
+    /* ---- candado de animación + navegación ---- */
+    let mediaOpen=false;   // true mientras un reproductor/visor está abierto
+    document.addEventListener('keydown',(e)=>{
+      if(flipping||(mediaOpen&&isMobile))return;
+      if(e.key==='ArrowRight')pageFlip.flipNext();
+      if(e.key==='ArrowLeft')pageFlip.flipPrev();
+    });
+    pageFlip.on('changeState',(e)=>{ flipping=(e.data==='flipping'||e.data==='user_fold'); });
+    // Bloqueo del libro: en MÓVIL si hay reproductor abierto; en cualquier caso durante animación.
+    ['mousedown','mousemove','click','touchstart','mouseover'].forEach(evt=>{
+      bookEl.addEventListener(evt,(ev)=>{
+        if(mediaOpen&&isMobile){ ev.stopPropagation(); return; }
+        if(flipping&&!ev.target.closest('.hotspot')){ ev.stopPropagation();ev.preventDefault(); }
+      },true);
+    });
+    bookEl.addEventListener('click',(ev)=>{
+      if(flipping||(mediaOpen&&isMobile))return;
+      if(ev.target.closest('.hotspot'))return;
+      if(pageFlip.getCurrentPageIndex()===0) pageFlip.flipNext();
+    });
+
+    /* =========================================================
+       REPRODUCTOR audio/video
+    ========================================================= */
+    const player=document.getElementById('player');
+    const playerArt=document.getElementById('playerArt');
+    const playerTitle=document.getElementById('playerTitle');
+    const playerSub=document.getElementById('playerSub');
+    const seek=document.getElementById('seek');
+    const seekFill=document.getElementById('seekFill');
+    const timeCur=document.getElementById('timeCur');
+    const timeDur=document.getElementById('timeDur');
+    let currentMedia=null, seeking=false;
+
+    function fmt(s){ if(!isFinite(s))return '0:00'; s=Math.floor(s); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+
+    function openMedia(hs){
+      if(hs.tipo==='imagen'){ openImage(hs); return; }
+      playerArt.innerHTML='';
+      player.classList.remove('video');
+      let media;
+      if(hs.tipo==='video'){
+        player.classList.add('video');
+        media=document.createElement('video'); media.src=hs.src; media.playsInline=true;
+        playerArt.appendChild(media);
+        // ajustar el contenedor a la proporción real del video (vertical u horizontal)
+        media.addEventListener('loadedmetadata',()=>{
+          if(media.videoWidth && media.videoHeight){
+            playerArt.style.aspectRatio = media.videoWidth + ' / ' + media.videoHeight;
+          }
+        });
+      } else {
+        playerArt.style.aspectRatio='';   // audio usa carátula cuadrada
+        const img=document.createElement('img'); img.src=DATA.audioCover; img.onerror=()=>{img.style.display='none';playerArt.style.background='radial-gradient(circle,#2aa3ef,#0d2a47)';};
+        media=document.createElement('audio'); media.src=hs.src;
+        playerArt.appendChild(img); playerArt.appendChild(media);
+      }
+      currentMedia=media;
+      playerTitle.textContent=hs.titulo||(hs.tipo==='video'?'Video':'Audio');
+      playerSub.textContent=hs.subtitulo||'';
+      const vol0=getSavedVolume();
+      document.getElementById('vol').value=vol0; media.volume=vol0;
+      seek.value=0; seekFill.style.width='0%'; timeCur.textContent='0:00'; timeDur.textContent='-0:00';
+      // los listeners usan 'media' (referencia fija) y comprueban que siga activo
+      media.addEventListener('loadedmetadata',()=>{ if(media!==currentMedia)return; timeDur.textContent='-'+fmt(media.duration); });
+      media.addEventListener('timeupdate',()=>{
+        if(media!==currentMedia)return;
+        if(seeking){ slog('timeupdate IGNORADO (seeking) ct='+media.currentTime.toFixed(1)); return; }
+        const d=media.duration||0, pct=d?media.currentTime/d*100:0;
+        seek.value=pct; seekFill.style.width=pct+'%';
+        timeCur.textContent=fmt(media.currentTime);
+        timeDur.textContent='-'+fmt(d-media.currentTime);
+      });
+      media.addEventListener('seeking',()=>{ slog('EVT seeking ct='+media.currentTime.toFixed(1)); });
+      media.addEventListener('seeked',()=>{ if(media!==currentMedia)return; slog('EVT seeked ct='+media.currentTime.toFixed(1)); seeking=false; });
+      centerWin(player); player.classList.add('open'); mediaOpen=true; if(isMobile) bookEl.style.pointerEvents='none';
+      media.play().catch(()=>{});
+    }
+    seek.oninput=()=>{ if(!currentMedia)return; seeking=true; const d=currentMedia.duration||0; seekFill.style.width=seek.value+'%'; timeCur.textContent=fmt(d*seek.value/100); };
+    function commitSeek(){
+      if(currentMedia){
+        const d=currentMedia.duration||0;
+        if(d){ seeking=true; const target=d*seek.value/100; slog('commit -> set ct='+target.toFixed(1)+' val='+seek.value); currentMedia.currentTime=target; }
+        else seeking=false;
+      } else seeking=false;
+    }
+    seek.onchange=commitSeek;
+    // En móvil, asegurar que al soltar el dedo se aplique la posición
+    seek.addEventListener('touchend',(e)=>{ e.stopPropagation(); commitSeek(); },true);
+    seek.addEventListener('pointerup',commitSeek);
+    seek.addEventListener('pointerup',commitSeek);
+    document.getElementById('btnPlay').onclick=()=>currentMedia&&currentMedia.play();
+    document.getElementById('btnPause').onclick=()=>currentMedia&&currentMedia.pause();
+    document.getElementById('btnStop').onclick=()=>{ if(currentMedia){currentMedia.pause();currentMedia.currentTime=0;} };
+    document.getElementById('vol').oninput=(e)=>{ if(currentMedia)currentMedia.volume=e.target.value; saveVolume(e.target.value); };
+
+    // Volumen persistente entre reproductores y entre sesiones (localStorage).
+    function getSavedVolume(){
+      try{ const v=parseFloat(localStorage.getItem('portafolioVolumen')); return (isFinite(v)&&v>=0&&v<=1)?v:1; }
+      catch(e){ return 1; }
+    }
+    function saveVolume(v){
+      try{ localStorage.setItem('portafolioVolumen', String(v)); }catch(e){}
+    }
+
+    /* =========================================================
+       VISOR de imagen
+    ========================================================= */
+    const viewer=document.getElementById('viewer');
+    const imgEl=document.getElementById('imgEl');
+    const viewerTitle=document.getElementById('viewerTitle');
+    const viewerSub=document.getElementById('viewerSub');
+    const zoomLabel=document.getElementById('zoomLabel');
+    let zoom=1, ix=0, iy=0;     // zoom y traslación (pan) de la imagen
+    function openImage(hs){
+      imgEl.src=hs.src; zoom=1; ix=0; iy=0; applyZoom();
+      viewerTitle.textContent=hs.titulo||'Imagen';
+      viewerSub.textContent=hs.subtitulo||'';
+      centerWin(viewer); viewer.classList.add('open'); mediaOpen=true; if(isMobile) bookEl.style.pointerEvents='none';
+    }
+    function clampImg(){
+      // limita el pan para no perder la imagen fuera del lienzo
+      const canvas=imgEl.parentElement;
+      const cw=canvas.clientWidth, ch=canvas.clientHeight;
+      const maxX=Math.max(0,(imgEl.offsetWidth*zoom - cw)/2);
+      const maxY=Math.max(0,(imgEl.offsetHeight*zoom - ch)/2);
+      ix=Math.max(-maxX,Math.min(maxX,ix));
+      iy=Math.max(-maxY,Math.min(maxY,iy));
+    }
+    function applyZoom(){
+      if(zoom<=1){ ix=0; iy=0; } else { clampImg(); }
+      imgEl.style.transform='translate('+ix+'px,'+iy+'px) scale('+zoom+')';
+      imgEl.style.cursor = zoom>1 ? 'grab' : 'default';
+      zoomLabel.textContent=Math.round(zoom*100)+'%';
+    }
+    document.getElementById('zoomIn').onclick=()=>{ zoom=Math.min(zoom+0.25,5); applyZoom(); };
+    document.getElementById('zoomOut').onclick=()=>{ zoom=Math.max(zoom-0.25,0.25); applyZoom(); };
+    document.getElementById('zoomReset').onclick=()=>{ zoom=1; ix=0; iy=0; applyZoom(); };
+
+    // PAN con mouse (escritorio)
+    let ipanning=false, ipsx=0, ipsy=0, ipix=0, ipiy=0;
+    imgEl.addEventListener('mousedown',(e)=>{
+      if(zoom<=1) return;
+      e.preventDefault(); ipanning=true; imgEl.style.cursor='grabbing';
+      ipsx=e.clientX; ipsy=e.clientY; ipix=ix; ipiy=iy;
+    });
+    document.addEventListener('mousemove',(e)=>{
+      if(!ipanning) return;
+      ix=ipix+(e.clientX-ipsx); iy=ipiy+(e.clientY-ipsy); clampImg();
+      imgEl.style.transform='translate('+ix+'px,'+iy+'px) scale('+zoom+')';
+    });
+    document.addEventListener('mouseup',()=>{ if(ipanning){ ipanning=false; imgEl.style.cursor='grab'; } });
+    // PAN con un dedo (móvil) — y rueda para zoom hacia donde apunta
+    imgEl.addEventListener('touchstart',(e)=>{
+      if(zoom<=1||e.touches.length!==1) return;
+      ipanning=true; ipsx=e.touches[0].clientX; ipsy=e.touches[0].clientY; ipix=ix; ipiy=iy;
+    },{passive:true});
+    imgEl.addEventListener('touchmove',(e)=>{
+      if(!ipanning||e.touches.length!==1) return;
+      e.preventDefault();
+      ix=ipix+(e.touches[0].clientX-ipsx); iy=ipiy+(e.touches[0].clientY-ipsy); clampImg();
+      imgEl.style.transform='translate('+ix+'px,'+iy+'px) scale('+zoom+')';
+    },{passive:false});
+    imgEl.addEventListener('touchend',()=>{ ipanning=false; });
+    // rueda del ratón sobre la imagen = zoom (escritorio)
+    imgEl.parentElement.addEventListener('wheel',(e)=>{
+      e.preventDefault();
+      zoom=Math.max(0.25,Math.min(5, zoom - e.deltaY*0.002));
+      applyZoom();
+    },{passive:false});
+
+    /* ---- cerrar ---- */
+    document.querySelectorAll('[data-close]').forEach(b=>{
+      b.onclick=()=>{
+        const w=document.getElementById(b.dataset.close);
+        w.classList.remove('open');
+        mediaOpen=false;
+        bookEl.style.pointerEvents = (mz>1 && !isMobile) ? 'none' : '';
+        if(b.dataset.close==='player'&&currentMedia){ currentMedia.pause(); currentMedia=null; playerArt.innerHTML=''; }
+      };
+    });
+
+    /* ---- centrar y arrastrar ventanas ---- */
+    function centerWin(w){
+      if(isMobile) return;   // en móvil el CSS posiciona el reproductor
+      w.style.left=(window.innerWidth/2-220)+'px'; w.style.top=(window.innerHeight/2-200)+'px';
+    }
+    function dragify(win,bar){
+      if(isMobile) return;   // sin arrastre en móvil
+      let dx=0,dy=0,down=false;
+      bar.addEventListener('mousedown',e=>{ if(e.target.closest('.closex'))return; down=true; dx=e.clientX-win.offsetLeft; dy=e.clientY-win.offsetTop; });
+      document.addEventListener('mousemove',e=>{ if(down){ win.style.left=(e.clientX-dx)+'px'; win.style.top=(e.clientY-dy)+'px'; } });
+      document.addEventListener('mouseup',()=>down=false);
+    }
+    dragify(player,document.getElementById('playerBar'));
+    dragify(viewer,document.getElementById('viewerBar'));
+
+    /* =========================================================
+       ZOOM de la revista (rueda + pinch). Sin slider.
+       - Rueda del ratón: acerca/aleja hacia el cursor.
+       - Con zoom>1: arrastrar para desplazarse; el paso de página se bloquea.
+       - Doble clic: alterna entre 100% y 200%.
+       - Móvil: pellizco (pinch) para acercar/alejar.
+    ========================================================= */
+    const zoomLayer=document.getElementById('zoomLayer');
+    const MZMIN=1, MZMAX=4;
+    function applyMagZoom(){
+      zoomLayer.style.transform = mz===1 ? '' : `translate(${mx}px,${my}px) scale(${mz})`;
+      // mientras hay zoom, el libro no debe pasar página por gesto (escritorio Y móvil)
+      bookEl.style.pointerEvents = (mz>1) ? 'none' : '';
+    }
+    function clampPan(){
+      // evita alejar la revista demasiado de la vista
+      const lim=(mz-1)*Math.max(window.innerWidth,window.innerHeight)/2;
+      mx=Math.max(-lim,Math.min(lim,mx)); my=Math.max(-lim,Math.min(lim,my));
+    }
+    // rueda (escritorio)
+    document.addEventListener('wheel',(e)=>{
+      if(mediaOpen) return;
+      if(!e.ctrlKey && Math.abs(e.deltaY)<1) return;
+      e.preventDefault();
+      const prev=mz;
+      mz=Math.max(MZMIN,Math.min(MZMAX, mz - e.deltaY*0.002));
+      if(mz===prev) return;
+      if(mz===1){ mx=0;my=0; } else { clampPan(); }
+      applyMagZoom();
+    },{passive:false});
+    // arrastre para desplazar cuando hay zoom (escritorio)
+    let panning=false, psx=0,psy=0,pmx=0,pmy=0;
+    document.addEventListener('mousedown',(e)=>{
+      if(mz<=1||isMobile||mediaOpen) return;
+      if(e.target.closest('.ipod')) return;
+      panning=true; psx=e.clientX; psy=e.clientY; pmx=mx; pmy=my; e.preventDefault();
+    });
+    document.addEventListener('mousemove',(e)=>{
+      if(!panning) return;
+      mx=pmx+(e.clientX-psx); my=pmy+(e.clientY-psy); clampPan(); applyMagZoom();
+    });
+    document.addEventListener('mouseup',()=>{ panning=false; });
+    // doble clic alterna zoom
+    bookEl.addEventListener('dblclick',(e)=>{
+      if(mediaOpen) return;
+      mz = mz>1 ? 1 : 2;
+      mx=0; my=0; applyMagZoom();
+    });
+    // pinch + pan (móvil)
+    let pinchStart=0, pinchBase=1;
+    let tpanning=false, tsx=0,tsy=0,tmx=0,tmy=0;
+    document.addEventListener('touchstart',(e)=>{
+      if(mediaOpen) return;
+      if(e.target.closest && e.target.closest('.ipod')) return;
+      if(e.touches.length>=2){
+        bookEl.style.pointerEvents='none';
+        pinchStart=0;
+      } else if(e.touches.length===1 && mz>1){
+        tpanning=true; tsx=e.touches[0].clientX; tsy=e.touches[0].clientY; tmx=mx; tmy=my;
+      }
+    },{passive:true});
+    document.addEventListener('touchmove',(e)=>{
+      if(mediaOpen) return;
+      if(e.target.closest && e.target.closest('.ipod')) return;
+      if(e.touches.length>=2){
+        const dx=e.touches[0].clientX-e.touches[1].clientX;
+        const dy=e.touches[0].clientY-e.touches[1].clientY;
+        const dist=Math.hypot(dx,dy);
+        if(!pinchStart){ pinchStart=dist; pinchBase=mz; return; }
+        e.preventDefault();
+        mz=Math.max(MZMIN,Math.min(MZMAX, pinchBase*(dist/pinchStart)));
+        if(mz===1){mx=0;my=0;} else { clampPan(); } applyMagZoom();
+      } else if(e.touches.length===1 && tpanning && mz>1){
+        e.preventDefault();
+        mx=tmx+(e.touches[0].clientX-tsx); my=tmy+(e.touches[0].clientY-tsy);
+        clampPan(); applyMagZoom();
+      }
+    },{passive:false});
+    document.addEventListener('touchend',(e)=>{
+      if(e.touches.length<2){ pinchStart=0; }
+      if(e.touches.length===0){
+        tpanning=false;
+        bookEl.style.pointerEvents = (mz>1) ? 'none' : '';
+      }
+    });
+    // (En móvil el zoom es solo por pinch; el tap simple se reserva para pasar página.)
+
+    // ===== NAVEGACIÓN POR TAP (móvil) — a nivel documento, inmune al z-index =====
+    // Mitad izquierda = anterior, mitad derecha = siguiente.
+    // Prioridad: hotspot bajo el dedo > reproductor abierto > zoom > pasar página.
+    if(isMobile){
+      let gsx=0, gsy=0, gt=0, gmulti=false;
+      document.addEventListener('touchstart',(e)=>{
+        if(e.target.closest && e.target.closest('.ipod')) return;  // no tocar el reproductor
+        if(e.touches.length>1){ gmulti=true; return; }
+        gmulti=false;
+        gsx=e.touches[0].clientX; gsy=e.touches[0].clientY; gt=Date.now();
+      },{passive:true});
+      document.addEventListener('touchend',(e)=>{
+        if(e.target.closest && e.target.closest('.ipod')) return;  // el reproductor maneja lo suyo
+        if(gmulti){ gmulti=false; return; }
+        if(e.touches.length>0) return;
+        if(mediaOpen) return;
+        if(mz>1) return;                       // con zoom, el toque es para pan
+        const t1=e.changedTouches[0];
+        const moved=Math.hypot(t1.clientX-gsx, t1.clientY-gsy);
+        const W=window.innerWidth;
+        if(moved>=40 || Date.now()-gt>=600){ return; }
+        // ¿hotspot bajo el dedo? darle prioridad
+        const under=document.elementFromPoint(t1.clientX,t1.clientY);
+        const hsEl=under&&under.closest?under.closest('.hotspot'):null;
+        if(hsEl){ return; }
+        if(flipping){ return; }
+        const derecha = t1.clientX > W/2;
+        const idx = pageFlip.getCurrentPageIndex();
+        const total = pageFlip.getPageCount();
+        if(derecha){
+          if(idx < total-1){ pageFlip.flipNext(); }
+        } else {
+          if(idx > 0){
+            // flipPrev no siempre responde en portrait; turnToPage es el respaldo fiable
+            try{ pageFlip.flipPrev(); }catch(e){}
+            setTimeout(function(){
+              if(pageFlip.getCurrentPageIndex()===idx){ pageFlip.turnToPage(idx-1); }
+            },120);
+          }
+        }
+      });
+    }
+
+   } catch(err){ var b=document.getElementById('errbox'); b.style.display='block'; b.textContent='⚠ '+(err&&err.message?err.message:err); }
+  }
+
+  window.addEventListener('load', boot);
+
+  // Recargar si se cruza el umbral móvil/escritorio (ej. rotar el teléfono)
+  let wasMobile = window.matchMedia('(max-width: 820px)').matches;
+  let rT;
+  window.addEventListener('resize', ()=>{
+    clearTimeout(rT);
+    rT = setTimeout(()=>{
+      const nowMobile = window.matchMedia('(max-width: 820px)').matches;
+      if(nowMobile !== wasMobile){ wasMobile = nowMobile; location.reload(); }
+    }, 350);
+  });
+  </script>
+</body>
+</html>
