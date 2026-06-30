@@ -395,18 +395,21 @@
 
   // Carga portafolio.json y arranca. Si falla, usa el respaldo.
   // Si viene de la vista previa del editor (?preview=1), usa sessionStorage.
-  function boot(){
-    if(location.search.indexOf('preview=1')>=0){
-      try{
-        const pv=sessionStorage.getItem('previewData');
-        if(pv){ DATA=JSON.parse(pv); start(); return; }
-      }catch(e){}
-    }
-    fetch('portafolio.json', {cache:'no-store'})
-      .then(r=>{ if(!r.ok) throw new Error('sin json'); return r.json(); })
-      .then(json=>{ DATA = json; start(); })
-      .catch(()=>{ DATA = FALLBACK_DATA; start(); });
-  }
+  const jsonPath = `${window.location.pathname.replace(/\/$/, '') || ''}/portfolio.json`;
+
+fetch(jsonPath, { cache: 'no-store' })
+  .then(r => {
+    if (!r.ok) throw new Error('sin json');
+    return r.json();
+  })
+  .then(json => {
+    DATA = json;
+    start();
+  })
+  .catch(() => {
+    DATA = FALLBACK_DATA;
+    start();
+  });
 
   function start(){
    try {
