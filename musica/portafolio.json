@@ -1,0 +1,189 @@
+{
+  "audioCover": "/media/Music-Icon.png",
+  "pages": [
+    {
+      "src": "/pages/P_1.webp",
+      "hard": true,
+      "hotspots": []
+    },
+    {
+      "src": "/pages/P_2.webp",
+      "hotspots": [
+        {
+          "tipo": "enlace",
+          "src": "https://www.instagram.com/nadanadaorion/",
+          "x": 16.1,
+          "y": 19,
+          "w": 67.8,
+          "h": 61.8,
+          "titulo": "Ori♡n",
+          "subtitulo": "Instagram"
+        }
+      ]
+    },
+    {
+      "src": "/pages/P_3.webp",
+      "hotspots": []
+    },
+    {
+      "src": "/pages/P_4.webp",
+      "hotspots": [
+        {
+          "tipo": "enlace",
+          "src": "https://www.instagram.com/latriplezzzeta/",
+          "x": 23.6,
+          "y": 6.8,
+          "w": 51.8,
+          "h": 83.5,
+          "titulo": "ATLAZZZ",
+          "subtitulo": "INSTAGRAM"
+        }
+      ]
+    },
+    {
+      "src": "/pages/P_5.webp",
+      "hotspots": [
+        {
+          "tipo": "audio",
+          "src": "/media/ASI SE SIENTE PERDER M&M_3.mp3",
+          "x": 18.4,
+          "y": 15.7,
+          "w": 65.3,
+          "h": 15,
+          "titulo": "Así se siente perder",
+          "subtitulo": "Atlazzz - Big Chale"
+        },
+        {
+          "tipo": "audio",
+          "src": "/media/QUERIDA M&M_1.mp3",
+          "x": 17.8,
+          "y": 42,
+          "w": 66.1,
+          "h": 15.9,
+          "titulo": "Querida",
+          "subtitulo": "Atlazzz - Big Chale"
+        },
+        {
+          "tipo": "audio",
+          "src": "/media/TODOS CONTRA MI M&M_4.mp3",
+          "x": 17.8,
+          "y": 67.5,
+          "w": 66.9,
+          "h": 18.2,
+          "titulo": "Todos contra mí",
+          "subtitulo": "Atlazzz -  Big Chale"
+        }
+      ]
+    },
+    {
+      "src": "/pages/P_8.webp",
+      "hotspots": [
+        {
+          "tipo": "enlace",
+          "src": "https://www.instagram.com/soyvabee/",
+          "x": 23.6,
+          "y": 6.3,
+          "w": 51.8,
+          "h": 84.7,
+          "titulo": "VABE",
+          "subtitulo": "Instagram"
+        }
+      ]
+    },
+    {
+      "src": "/pages/P_9.webp",
+      "hotspots": [
+        {
+          "tipo": "audio",
+          "src": "/media/ME VAN A ELEGIR M&M_1.mp3",
+          "x": 17.6,
+          "y": 16.2,
+          "w": 66.3,
+          "h": 14.6,
+          "titulo": "ME VAN A ELEGIR",
+          "subtitulo": "Vabe"
+        },
+        {
+          "tipo": "audio",
+          "src": "/media/UN LUGAR M&M_5.mp3",
+          "x": 17.4,
+          "y": 42.5,
+          "w": 66.7,
+          "h": 14.7,
+          "titulo": "UN LUGAR",
+          "subtitulo": "Vabe"
+        },
+        {
+          "tipo": "audio",
+          "src": "/media/HOMBRES COMO TU M&M_1.mp3",
+          "x": 17.2,
+          "y": 70,
+          "w": 66.7,
+          "h": 14.4,
+          "titulo": "HOMBRES COMO TÚ",
+          "subtitulo": "Vabe"
+        }
+      ]
+    },
+    {
+      "src": "/pages/P_12.webp",
+      "hotspots": [
+        {
+          "tipo": "enlace",
+          "src": "https://www.instagram.com/tabu.wav/",
+          "x": 22.8,
+          "y": 5.6,
+          "w": 54.7,
+          "h": 86.2,
+          "titulo": "",
+          "subtitulo": ""
+        }
+      ]
+    },
+    {
+      "src": "/pages/P_13.webp",
+      "hotspots": [
+        {
+          "tipo": "audio",
+          "src": "/media/DESPACIO_MASTER_1.mp3",
+          "x": 18.2,
+          "y": 29.4,
+          "w": 64.2,
+          "h": 14.6,
+          "titulo": "DESPACIO",
+          "subtitulo": "Tabu -  Single"
+        },
+        {
+          "tipo": "audio",
+          "src": "/media/ADA_MASTER_V3.mp3",
+          "x": 18,
+          "y": 55.6,
+          "w": 64.9,
+          "h": 15.4,
+          "titulo": "ANTES DE ABRIL",
+          "subtitulo": "Tabu - Single"
+        }
+      ]
+    },
+    {
+      "src": "/pages/P_14.webp",
+      "hard": true,
+      "hotspots": [
+        {
+          "tipo": "enlace",
+          "src": "https://www.instagram.com/nadanadaorion/",
+          "x": 28.8,
+          "y": 45.1,
+          "w": 42.6,
+          "h": 9.7,
+          "titulo": "Ori♡n",
+          "subtitulo": "Instagram"
+        }
+      ]
+    }
+  ],
+  "background": {
+    "tipo": "color",
+    "valor": "#FD3DB5"
+  }
+}
