@@ -103,11 +103,16 @@
     transition: transform .55s cubic-bezier(.22,.61,.36,1);
   }
   /* En escritorio, cuando la revista está cerrada (portada sola), se centra
-     desplazándose media página a la derecha; al abrir vuelve a 0 con animación. */
-  #book.cover-centered{ transform: translateX(var(--cover-shift, 0px)); box-shadow:none; }
-  /* Ocultar la sombra de la "página fantasma" cuando portada/contraportada va sola */
+     desplazándose media página a la derecha; al abrir vuelve a 0 con animación.
+     Se conserva la sombra proyectada (box-shadow) para que no se vea plana. */
+  #book.cover-centered{ position:relative; transform: translateX(var(--cover-shift, 0px)); }
+  /* Ocultar la sombra de la "página fantasma" (la librería genera varias capas
+     de sombra internas) cuando portada/contraportada va sola, en las dos
+     direcciones (portada y contraportada). */
   #book.cover-centered .stf__outerShadow,
-  #book.cover-centered .stf__shadow{ display:none !important; opacity:0 !important; }
+  #book.cover-centered .stf__innerShadow,
+  #book.cover-centered .stf__hardShadow,
+  #book.cover-centered .stf__hardInnerShadow{ display:none !important; opacity:0 !important; }
   .stf__parent{ margin:0 auto; }
   .page{ position:relative; background:#fff;width:100%;height:100%;overflow:hidden; }
   .pageimg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; user-select:none; }
@@ -131,8 +136,22 @@
         rgba(0,0,0,.28) 0%, rgba(0,0,0,.10) 4%, rgba(0,0,0,0) 12%,
         rgba(255,255,255,0) 78%, rgba(255,255,255,.06) 100%);
   }
-  /* En portada/contraportada (hoja sola) no hay lomo: suaviza el efecto */
+  /* En portada/contraportada (hoja sola) no hay lomo: suaviza el degradado... */
   #book.cover-centered .page-fx{ opacity:.25; }
+  /* ...pero se agrega un "canto" de hojas apiladas en el borde libre (donde no
+     está el lomo) para dar sensación de volumen incluso con la revista cerrada. */
+  #book.cover-centered::after{
+    content:"";
+    position:absolute; top:1.5%; bottom:1.5%; width:9px;
+    background:repeating-linear-gradient(to bottom,
+      #e9e9e9 0px, #e9e9e9 1px, #c7c7c7 1px, #c7c7c7 2px);
+    box-shadow: inset 0 0 5px rgba(0,0,0,.45), 1px 0 3px rgba(0,0,0,.25);
+    pointer-events:none;
+  }
+  /* Portada sola: el lomo queda a la izquierda, el canto de hojas a la derecha. */
+  #book.cover-centered.cover-front::after{ right:-9px; border-radius:0 3px 3px 0; }
+  /* Contraportada sola: el lomo queda a la derecha, el canto a la izquierda. */
+  #book.cover-centered.cover-back::after{ left:-9px; border-radius:3px 0 0 3px; }
 
   /* ---------- hotspots ---------- */
   .hotspot{
@@ -290,6 +309,7 @@
     /* Móvil: solo sombra proyectada ligera; sin lomo ni curvatura */
     #book{ box-shadow: 0 10px 24px rgba(0,0,0,.4) !important; }
     .page-fx{ display:none !important; }
+    #book.cover-centered::after{ display:none !important; }
   }
 </style>
 </head>
@@ -430,7 +450,11 @@
     if(DATA.background){
       const bg=DATA.background;
       if(bg.tipo==='imagen' && bg.valor){
-        document.body.style.background='#15151c url("'+bg.valor+'") center/cover no-repeat fixed';
+        // Sin "fixed": en móvil, background-attachment:fixed provoca que el
+        // navegador recalcule/parpadee (efecto de "zoom" momentáneo) al
+        // interactuar con la página (p.ej. al pasar de hoja). El body no
+        // hace scroll (overflow:hidden), así que "fixed" no aporta nada.
+        document.body.style.background='#15151c url("'+bg.valor+'") center/cover no-repeat';
       } else if(bg.tipo==='color' && bg.valor){
         document.body.style.background=bg.valor;
       }
@@ -541,13 +565,15 @@
       if(onCover){
         // portada sola a la derecha → mover el conjunto a la izquierda para centrarla
         bookEl.style.setProperty('--cover-shift', (-pageW/2)+'px');
-        bookEl.classList.add('cover-centered');
+        bookEl.classList.add('cover-centered','cover-front');
+        bookEl.classList.remove('cover-back');
       } else if(onBack){
         // contraportada sola a la izquierda → mover a la derecha para centrarla
         bookEl.style.setProperty('--cover-shift', (pageW/2)+'px');
-        bookEl.classList.add('cover-centered');
+        bookEl.classList.add('cover-centered','cover-back');
+        bookEl.classList.remove('cover-front');
       } else {
-        bookEl.classList.remove('cover-centered');
+        bookEl.classList.remove('cover-centered','cover-front','cover-back');
       }
     }
     // primer centrado sin animación (evita un salto al cargar)
@@ -784,11 +810,12 @@
     dragify(viewer,document.getElementById('viewerBar'));
 
     /* =========================================================
-       ZOOM de la revista (rueda + pinch). Sin slider.
-       - Rueda del ratón: acerca/aleja hacia el cursor.
-       - Con zoom>1: arrastrar para desplazarse; el paso de página se bloquea.
+       ZOOM de la revista (rueda + pinch). Sin slider ni botones.
+       - Rueda del ratón / pellizco: acercan y alejan libremente, pero el
+         alejamiento nunca pasa del tamaño inicial (mz=1): ese es el piso,
+         no se puede "salir" de la vista normal haciendo zoom out de más.
        - Doble clic: alterna entre 100% y 200%.
-       - Móvil: pellizco (pinch) para acercar/alejar.
+       - Con zoom>1: arrastrar para desplazarse; el paso de página se bloquea.
     ========================================================= */
     const zoomLayer=document.getElementById('zoomLayer');
     const MZMIN=1, MZMAX=4;
