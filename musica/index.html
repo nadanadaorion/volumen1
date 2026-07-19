@@ -728,15 +728,45 @@
     },{passive:false});
 
     /* ---- cerrar ---- */
+    function closeWindow(id){
+      const w=document.getElementById(id);
+      if(!w||!w.classList.contains('open')) return;
+      w.classList.remove('open');
+      mediaOpen=false;
+      bookEl.style.pointerEvents = (mz>1 && !isMobile) ? 'none' : '';
+      if(id==='player'&&currentMedia){ currentMedia.pause(); currentMedia=null; playerArt.innerHTML=''; }
+    }
     document.querySelectorAll('[data-close]').forEach(b=>{
-      b.onclick=()=>{
-        const w=document.getElementById(b.dataset.close);
-        w.classList.remove('open');
-        mediaOpen=false;
-        bookEl.style.pointerEvents = (mz>1 && !isMobile) ? 'none' : '';
-        if(b.dataset.close==='player'&&currentMedia){ currentMedia.pause(); currentMedia=null; playerArt.innerHTML=''; }
-      };
+      b.onclick=()=>{ closeWindow(b.dataset.close); };
     });
+
+    /* ---- cerrar al hacer clic/tap FUERA del reproductor abierto ----
+       Escritorio: el primer clic fuera SOLO cierra (no navega); el
+       siguiente clic ya voltea página. Móvil: cualquier tap fuera cierra.
+       Se usa la fase de captura y se detiene el evento para que ese primer
+       clic no llegue al libro. */
+    let suppressNextClick=false;   // el gesto que cierra no debe además navegar
+    function outsideCloser(ev){
+      if(!mediaOpen) return;
+      const openWin=document.querySelector('.ipod.open');
+      if(!openWin) return;
+      if(openWin.contains(ev.target)) return;   // clic dentro del reproductor: ignorar
+      ev.stopPropagation();
+      ev.preventDefault();
+      suppressNextClick=true;
+      closeWindow(openWin.id);
+    }
+    document.addEventListener('mousedown', outsideCloser, true);
+    document.addEventListener('touchstart', outsideCloser, {capture:true, passive:false});
+    // Cancela el click/touchend que pertenece al mismo gesto de cierre.
+    // No se limpia la bandera de inmediato: se deja un instante para que
+    // también la ignore el listener de navegación por tap (fase burbuja).
+    document.addEventListener('click',(ev)=>{
+      if(suppressNextClick){ ev.stopPropagation(); ev.preventDefault(); setTimeout(()=>{suppressNextClick=false;},0); }
+    }, true);
+    document.addEventListener('touchend',(ev)=>{
+      if(suppressNextClick){ ev.stopPropagation(); setTimeout(()=>{suppressNextClick=false;},0); }
+    }, true);
 
     /* ---- centrar y arrastrar ventanas ---- */
     function centerWin(w){
@@ -855,6 +885,7 @@
         if(e.target.closest && e.target.closest('.ipod')) return;  // el reproductor maneja lo suyo
         if(gmulti){ gmulti=false; return; }
         if(e.touches.length>0) return;
+        if(suppressNextClick) return;   // este tap cerró el reproductor, no navega
         if(mediaOpen) return;
         if(mz>1) return;                       // con zoom, el toque es para pan
         const t1=e.changedTouches[0];

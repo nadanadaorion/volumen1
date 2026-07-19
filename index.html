@@ -306,7 +306,7 @@
   <script>
   window.onerror=function(m,s,l,c,e){var b=document.getElementById('errbox');b.style.display='block';b.textContent='⚠ ERROR\n\n'+m+'\n'+s+'  L'+l+':'+c+'\n\n'+(e&&e.stack?e.stack:'');return false;};
   </script>
-  <script src="lib/page-flip.browser.js"></script>
+  <script src="/lib/page-flip.browser.js"></script>
 
   <!-- ===== Reproductor audio/video (iPod) ===== -->
   <div class="ipod" id="player">
@@ -404,8 +404,15 @@
         if(pv){ DATA=JSON.parse(pv); start(); return; }
       }catch(e){}
     }
-    fetch('portafolio.json', {cache:'no-store'})
-      .then(r=>{ if(!r.ok) throw new Error('sin json'); return r.json(); })
+    // Busca el JSON junto al index.html actual.
+    // Ejemplos:
+    //   /                -> /portafolio.json
+    //   /musica/         -> /musica/portafolio.json
+    //   /visual/         -> /visual/portafolio.json
+    const jsonUrl = new URL('portafolio.json', window.location.href);
+
+    fetch(jsonUrl.href, {cache:'no-store'})
+      .then(r=>{ if(!r.ok) throw new Error('sin json: '+jsonUrl.pathname); return r.json(); })
       .then(json=>{ DATA = json; start(); })
       .catch(()=>{ DATA = FALLBACK_DATA; start(); });
   }
