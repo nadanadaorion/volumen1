@@ -118,6 +118,16 @@
      soft de la hoja suelta (portada o contraportada sola). */
   #book.cover-centered .stf__outerShadow,
   #book.cover-centered .stf__innerShadow{ display:none !important; opacity:0 !important; }
+  /* "Cuadrado fantasma": al cerrar hacia una hoja hard (portada/contraportada),
+     la librería mantiene renderizada la página vecina estática (--soft --simple)
+     como si siguiera habiendo un pliego de dos páginas. En cierto punto de esa
+     animación esa página vecina se pinta en blanco liso (sin su imagen), y se ve
+     como un rectángulo pálido flotando sobre el fondo. Como esa página vecina
+     solo aparece junto a un giro de hoja hard, se oculta en ese caso puntual sin
+     afectar el efecto de las vueltas de página interiores (que no tienen --hard). */
+  .stf__block:has(> .stf__item.--hard) > .stf__item.--soft.--simple{
+    visibility:hidden !important;
+  }
   .stf__parent{ margin:0 auto; }
   .page{ position:relative; background:#fff;width:100%;height:100%;overflow:hidden; }
   .pageimg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; user-select:none; }
