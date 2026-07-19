@@ -104,16 +104,8 @@
   }
   /* En escritorio, cuando la revista está cerrada (portada sola), se centra
      desplazándose media página a la derecha; al abrir vuelve a 0 con animación.
-     Sombra ambiental suave y difusa (varias capas, tipo "tarjeta flotando")
-     para que la hoja suelta tenga volumen propio en vez de verse plana. */
-  #book.cover-centered{
-    transform: translateX(var(--cover-shift, 0px));
-    box-shadow:
-      0 1px 2px rgba(20,20,30,.10),
-      0 8px 16px rgba(20,20,30,.12),
-      0 28px 46px rgba(20,20,30,.14),
-      0 46px 80px rgba(20,20,30,.10);
-  }
+     Sin sombra propia: una sola hoja suelta no debe proyectar sombra. */
+  #book.cover-centered{ transform: translateX(var(--cover-shift, 0px)); box-shadow:none; }
   /* Las sombras "duras" (hardShadow / hardInnerShadow) SOLO las dibuja la
      librería al voltear una hoja hard, que aquí son únicamente la portada y la
      contraportada. Se ocultan SIEMPRE para que no aparezca ninguna sombra al
@@ -149,20 +141,8 @@
         rgba(0,0,0,.28) 0%, rgba(0,0,0,.10) 4%, rgba(0,0,0,0) 12%,
         rgba(255,255,255,0) 78%, rgba(255,255,255,.06) 100%);
   }
-  /* En portada/contraportada (hoja sola) no hay lomo (no hay hoja vecina que
-     lo justifique), pero SÍ se reutiliza esta misma capa para un barniz de luz
-     suave: más clara arriba-izquierda (como si le diera la luz), apagándose
-     hacia el centro y con una sombra apenas perceptible abajo-derecha. Da
-     sensación de volumen a la hoja suelta sin verse como un degradado de lomo. */
-  #book.cover-centered .page-fx{
-    opacity:1;
-    background: linear-gradient(160deg,
-      rgba(255,255,255,.32) 0%,
-      rgba(255,255,255,.10) 16%,
-      rgba(255,255,255,0) 34%,
-      rgba(0,0,0,0) 68%,
-      rgba(0,0,0,.05) 100%);
-  }
+  /* En portada/contraportada (hoja sola) no hay lomo: sin degradado ni sombra */
+  #book.cover-centered .page-fx{ opacity:0; }
 
   /* ---------- hotspots ---------- */
   .hotspot{
