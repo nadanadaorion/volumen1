@@ -106,13 +106,18 @@
      desplazándose media página a la derecha; al abrir vuelve a 0 con animación.
      Sin sombra propia: una sola hoja suelta no debe proyectar sombra. */
   #book.cover-centered{ transform: translateX(var(--cover-shift, 0px)); box-shadow:none; }
-  /* Ocultar la sombra de la "página fantasma" (la librería genera varias capas
-     de sombra internas) cuando portada/contraportada va sola, en las dos
-     direcciones (portada y contraportada). */
+  /* Las sombras "duras" (hardShadow / hardInnerShadow) SOLO las dibuja la
+     librería al voltear una hoja hard, que aquí son únicamente la portada y la
+     contraportada. Se ocultan SIEMPRE para que no aparezca ninguna sombra al
+     cerrar/abrir hacia ellas, ni durante toda la animación de giro (cuando la
+     clase cover-centered todavía no está aplicada) ni en reposo. No afecta al
+     efecto 3D de los giros interiores, que usan las sombras soft de abajo. */
+  .stf__hardShadow,
+  .stf__hardInnerShadow{ display:none !important; opacity:0 !important; }
+  /* En reposo, con la revista cerrada, ocultar también la sombra "fantasma"
+     soft de la hoja suelta (portada o contraportada sola). */
   #book.cover-centered .stf__outerShadow,
-  #book.cover-centered .stf__innerShadow,
-  #book.cover-centered .stf__hardShadow,
-  #book.cover-centered .stf__hardInnerShadow{ display:none !important; opacity:0 !important; }
+  #book.cover-centered .stf__innerShadow{ display:none !important; opacity:0 !important; }
   .stf__parent{ margin:0 auto; }
   .page{ position:relative; background:#fff;width:100%;height:100%;overflow:hidden; }
   .pageimg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; user-select:none; }
