@@ -1,79 +1,73 @@
 <!DOCTYPE html>
 <!--
   ============================================================================
-  PORTAFOLIO · REVISTA INTERACTIVA
+  PORTAFOLIO · REVISTA INTERACTIVA 3D (Three.js)
   ============================================================================
   Estructura del proyecto:
-    /index.html                  este archivo (el VISOR)
-    /lib/page-flip.browser.js    motor de paso de página (no editar)
-    /pages/                      imágenes de las páginas (A4, 1191x1684)
-    /media/                      videos, audios, imágenes y carátula de audio
+    /index.html            este archivo (el VISOR 3D)
+    /lib/three.min.js      motor 3D Three.js r160 (no editar)
+    /pages/                imágenes de las páginas (A4, 1191x1684)
+    /media/                videos, audios, imágenes y carátula de audio
+    /portafolio.json       contenido (páginas, hotspots, fondo) — lo genera editor.html
+
+  MODELO DE HOJAS:
+    Cada HOJA física de la revista tiene dos caras:
+      pages[0] = frente hoja 0 (portada)     pages[1] = dorso hoja 0
+      pages[2] = frente hoja 1               pages[3] = dorso hoja 1  …
+    El número de páginas debería ser PAR; si es impar, la última hoja
+    tendrá el dorso en blanco.
 
   CÓMO CAMBIAR EL LOOK DE LOS REPRODUCTORES:
     Edita únicamente los TOKENS DE TEMA en el bloque :root (más abajo).
-    Todos los colores, tamaños y fuentes de los reproductores salen de ahí.
-    No hace falta tocar las reglas .ipod ni el JavaScript.
 
   CÓMO CAMBIAR EL CONTENIDO (páginas, medios, hotspots):
-    Edita el objeto DATA en el <script> (o, mejor, usa el editor de la Fase 3,
-    que genera este mismo objeto como JSON).
+    Usa editor.html (genera portafolio.json). Los hotspots se definen en
+    porcentaje sobre cada página, igual que en la versión anterior.
   ============================================================================
 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- Favicon -->
 <link rel="icon" href="/favicon.png" type="image/png">
 <title>Ori♡n - Visual</title>
 <style>
   /* =====================================================================
      TOKENS DE TEMA  ·  Edita SOLO esta sección para cambiar la apariencia.
-     ---------------------------------------------------------------------
-     Fondo de la escena y acento general:
   ===================================================================== */
   :root{
     --bg:#15151c;
     --accent:#e6c878;
 
-    /* ---------- REPRODUCTOR (audio / video / imagen) ----------
-       Cambia estos valores para rediseñar el look de los tres reproductores.
-       Están agrupados por función para que sea fácil de seguir.        */
+    /* ---------- REPRODUCTOR (audio / video / imagen) ---------- */
+    --pl-width: 430px;
+    --pl-radius: 12px;
+    --pl-bg: linear-gradient(#ffffff,#eef1f5);
+    --pl-border: 1px solid #c8ccd4;
+    --pl-shadow: 0 22px 60px rgba(0,0,0,.45);
+    --pl-font: system-ui, sans-serif;
 
-    /* Tarjeta (contenedor) */
-    --pl-width: 430px;                 /* ancho del reproductor */
-    --pl-radius: 12px;                 /* redondeo de esquinas */
-    --pl-bg: linear-gradient(#ffffff,#eef1f5);   /* fondo de la tarjeta */
-    --pl-border: 1px solid #c8ccd4;    /* borde de la tarjeta */
-    --pl-shadow: 0 22px 60px rgba(0,0,0,.45);    /* sombra de la tarjeta */
-    --pl-font: system-ui, sans-serif;  /* tipografía del reproductor */
-
-    /* Barra superior ("Now Playing") */
     --pl-topbar-bg: linear-gradient(#fdfdfd,#e9edf2);
     --pl-topbar-border: #d6dae1;
     --pl-topbar-color: #333;
-    --pl-accent-blue: #2aa3ef;         /* icono play y acentos azules */
+    --pl-accent-blue: #2aa3ef;
 
-    /* Carátula / área de medio */
-    --pl-art-size: 150px;              /* lado de la carátula de audio */
+    --pl-art-size: 150px;
     --pl-art-bg: #000;
     --pl-art-radius: 4px;
 
-    /* Textos (título / subtítulo) */
     --pl-title-size: 20px;
     --pl-title-color: #111;
     --pl-sub-size: 15px;
     --pl-sub-color: #888;
 
-    /* Barra de progreso */
-    --pl-track-bg: #d7dbe2;            /* riel */
-    --pl-fill: linear-gradient(#5cc3ff,#1c95e8);  /* relleno reproducido */
+    --pl-track-bg: #d7dbe2;
+    --pl-fill: linear-gradient(#5cc3ff,#1c95e8);
     --pl-thumb-bg: radial-gradient(circle at 35% 30%,#fff,#bcc3cc);
     --pl-thumb-border: #8a929d;
     --pl-time-color: #555;
-    --pl-time-color-rem: #999;         /* tiempo restante (derecha) */
+    --pl-time-color-rem: #999;
 
-    /* Botonera inferior */
     --pl-controls-bg: linear-gradient(#f6f8fb,#e9edf2);
     --pl-controls-border: #e2e5ea;
     --pl-btn-bg: linear-gradient(#ffffff,#dfe5ec);
@@ -83,7 +77,6 @@
     --pl-btn-color: #33597a;
     --pl-vol-accent: #1c95e8;
 
-    /* Visor de imagen */
     --pl-imgcanvas-bg: #111;
     --pl-imgcanvas-h: 360px;
   }
@@ -92,75 +85,24 @@
   body{
     background: radial-gradient(circle at 50% 30%, #25252f, var(--bg));
     font-family:system-ui,sans-serif;
-    display:flex;align-items:center;justify-content:center;
     overflow:hidden;
   }
-  #zoomLayer{ transition: transform .18s ease-out; will-change: transform; }
-  #book{
-    box-shadow:
-      0 18px 30px rgba(0,0,0,.35),
-      0 40px 80px rgba(0,0,0,.45);
-    transition: transform .55s cubic-bezier(.22,.61,.36,1);
-  }
-  /* En escritorio, cuando la revista está cerrada (portada sola), se centra
-     desplazándose media página a la derecha; al abrir vuelve a 0 con animación.
-     Sin sombra propia: una sola hoja suelta no debe proyectar sombra. */
-  #book.cover-centered{ transform: translateX(var(--cover-shift, 0px)); box-shadow:none; }
-  /* Las sombras "duras" (hardShadow / hardInnerShadow) SOLO las dibuja la
-     librería al voltear una hoja hard, que aquí son únicamente la portada y la
-     contraportada. Se ocultan SIEMPRE para que no aparezca ninguna sombra al
-     cerrar/abrir hacia ellas, ni durante toda la animación de giro (cuando la
-     clase cover-centered todavía no está aplicada) ni en reposo. No afecta al
-     efecto 3D de los giros interiores, que usan las sombras soft de abajo. */
-  .stf__hardShadow,
-  .stf__hardInnerShadow{ display:none !important; opacity:0 !important; }
-  /* En reposo, con la revista cerrada, ocultar también la sombra "fantasma"
-     soft de la hoja suelta (portada o contraportada sola). */
-  #book.cover-centered .stf__outerShadow,
-  #book.cover-centered .stf__innerShadow{ display:none !important; opacity:0 !important; }
-  .stf__parent{ margin:0 auto; }
-  .page{ position:relative; background:#fff;width:100%;height:100%;overflow:hidden; }
-  .pageimg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; user-select:none; }
-  .page-hard{ background:#1c1c28; }
+  /* lienzo 3D a pantalla completa; el fondo del body se ve a través (alpha) */
+  #contenedor{ position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
 
-  /* ---------- Efecto 3D de la revista (escritorio) ---------- */
-  /* Capa de sombras/luces SOBRE cada página. No captura clics (hotspots intactos). */
-  .page-fx{ position:absolute; inset:0; pointer-events:none; z-index:4; }
-  /* Punto 1 (lomo): degradado oscuro hacia el borde interno de cada hoja.
-     Punto 3 (curvatura): leve aclarado hacia el borde externo.
-     El lado se decide con la clase .left / .right que añade el JS. */
-  .page-fx.right{
-    background:
-      linear-gradient(to right,
-        rgba(0,0,0,.28) 0%, rgba(0,0,0,.10) 4%, rgba(0,0,0,0) 12%,
-        rgba(255,255,255,0) 78%, rgba(255,255,255,.06) 100%);
+  /* barra de navegación inferior */
+  #ui{
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+    display:flex; gap:10px; align-items:center; z-index:900;
+    background:rgba(20,20,28,.65); padding:8px 12px; border-radius:10px;
+    box-shadow:0 4px 16px rgba(0,0,0,.35); backdrop-filter:blur(4px);
   }
-  .page-fx.left{
-    background:
-      linear-gradient(to left,
-        rgba(0,0,0,.28) 0%, rgba(0,0,0,.10) 4%, rgba(0,0,0,0) 12%,
-        rgba(255,255,255,0) 78%, rgba(255,255,255,.06) 100%);
+  #ui button{
+    padding:8px 14px; border:1px solid rgba(230,200,120,.35); border-radius:6px;
+    background:rgba(255,255,255,.06); color:var(--accent); cursor:pointer; font-size:14px;
   }
-  /* En portada/contraportada (hoja sola) no hay lomo: sin degradado ni sombra */
-  #book.cover-centered .page-fx{ opacity:0; }
-
-  /* ---------- hotspots ---------- */
-  .hotspot{
-    position:absolute; cursor:pointer; border-radius:6px; z-index:5;
-    background:rgba(230,200,120,.0);
-    transition:background .2s, box-shadow .2s;
-  }
-  .hotspot:hover{
-    background:rgba(230,200,120,.18);
-    box-shadow:0 0 0 2px var(--accent), 0 0 25px rgba(230,200,120,.4);
-  }
-  .hotspot .badge{
-    position:absolute; top:6px; left:6px;
-    background:rgba(20,20,28,.8); color:var(--accent);
-    font-size:11px; padding:2px 7px; border-radius:4px;
-    opacity:0; transition:opacity .2s; pointer-events:none;
-  }
-  .hotspot:hover .badge{ opacity:1; }
+  #ui button:hover:not(:disabled){ background:rgba(230,200,120,.18); }
+  #ui button:disabled{ opacity:.35; cursor:default; }
 
   /* ===================================================
      REPRODUCTOR estilo iPod / "Now Playing"
@@ -177,7 +119,6 @@
   .ipod.open{ display:block; }
   .ipod .screen{ background:transparent; }
 
-  /* barra superior */
   .ipod .topbar{
     display:flex; align-items:center; justify-content:space-between;
     padding:9px 12px; font-size:13px; font-weight:600; color:var(--pl-topbar-color);
@@ -197,7 +138,6 @@
   }
   .ipod .closex:hover{ color:#333; }
 
-  /* cuerpo: carátula/medio + info */
   .ipod .nowbody{ display:flex; gap:16px; padding:18px; align-items:center; }
   .ipod .art{
     width:var(--pl-art-size); height:var(--pl-art-size); flex:none; background:var(--pl-art-bg);
@@ -206,20 +146,17 @@
     display:flex; align-items:center; justify-content:center;
   }
   .ipod .art img, .ipod .art video{ width:100%; height:100%; object-fit:cover; display:block; }
-  /* el video NO se recorta: se ve completo, adaptándose a su proporción */
   .ipod.video .art video{ object-fit:contain; background:#000; }
   .ipod .info{ flex:1; min-width:0; }
   .ipod .info .ttl{ font-size:var(--pl-title-size); font-weight:700; color:var(--pl-title-color); line-height:1.2; }
   .ipod .info .sub{ font-size:var(--pl-sub-size); color:var(--pl-sub-color); margin-top:6px; }
 
-  /* video: ocupa el ancho; la proporción la fija el JS según el video real */
   .ipod.video .nowbody{ flex-direction:column; gap:10px; padding:16px; align-items:stretch; }
   .ipod.video .art{ width:100%; height:auto; aspect-ratio:16/9; max-height:70vh; }
   .ipod.video .info{ text-align:center; }
   .ipod.video .info .ttl{ font-size:17px; }
   .ipod.video .info .sub{ font-size:13px; margin-top:2px; }
 
-  /* barra de progreso */
   .ipod .seekrow{
     display:flex; align-items:center; gap:10px;
     padding:6px 18px 10px; font-size:12px; color:var(--pl-time-color);
@@ -228,8 +165,8 @@
   .ipod .seekrow input[type=range]{
     -webkit-appearance:none; appearance:none; flex:1; height:7px;
     border-radius:4px; background:transparent; outline:none; cursor:pointer;
-    touch-action:none;            /* el slider maneja el arrastre táctil, no el navegador */
-    position:relative; z-index:3; /* por encima del relleno y la pista */
+    touch-action:none;
+    position:relative; z-index:3;
   }
   .ipod .seekrow input[type=range]::-webkit-slider-thumb{
     -webkit-appearance:none; width:15px; height:15px; border-radius:50%;
@@ -246,7 +183,6 @@
     background:var(--pl-fill); pointer-events:none; width:0%; }
   .ipod .timeR{ color:var(--pl-time-color-rem); }
 
-  /* botonera inferior */
   .ipod .controls{
     display:flex; align-items:center; justify-content:center; gap:12px;
     padding:10px 16px 16px;
@@ -263,7 +199,6 @@
   .ipod .controls .vol{ display:flex; align-items:center; gap:6px; color:#667; font-size:13px; margin-left:4px; }
   .ipod .controls .vol input{ width:78px; accent-color:var(--pl-vol-accent); }
 
-  /* visor de imagen */
   .ipod.image .nowbody{ padding:0; }
   .ipod.image .imgcanvas{
     width:100%; height:var(--pl-imgcanvas-h); background:var(--pl-imgcanvas-bg); overflow:hidden;
@@ -274,7 +209,6 @@
 
   /* ============ RESPONSIVE (móvil) ============ */
   @media (max-width: 820px){
-    /* reproductores: ancho casi completo, fijos arriba-centro, sin depender de arrastre */
     .ipod{
       width: calc(100vw - 24px) !important;
       max-width: 460px;
@@ -287,9 +221,8 @@
     .ipod .info .ttl{ font-size:17px; }
     .ipod .info .sub{ font-size:13px; }
     .ipod.image .imgcanvas{ height:46vh; }
-    .ipod .topbar{ cursor:default; }     /* no arrastrar en móvil */
+    .ipod .topbar{ cursor:default; }
     .ipod .controls{ flex-wrap:wrap; gap:10px; }
-    /* Slider de tiempo: zona táctil más grande y fácil de agarrar en móvil */
     .ipod .seekrow{ padding-top:12px; padding-bottom:14px; }
     .ipod .seekrow .barwrap{ height:24px; display:flex; align-items:center; }
     .ipod .seekrow input[type=range]{ height:24px; }
@@ -297,14 +230,18 @@
     .ipod .seekrow input[type=range]::-moz-range-thumb{ width:22px; height:22px; }
     .ipod .seekrow .barwrap .track,
     .ipod .seekrow .fill{ top:50%; transform:translateY(-50%); }
-    /* Móvil: solo sombra proyectada ligera; sin lomo ni curvatura */
-    #book{ box-shadow: 0 10px 24px rgba(0,0,0,.4) !important; }
-    .page-fx{ display:none !important; }
+    #ui{ bottom:10px; padding:6px 10px; }
+    #ui button{ padding:7px 12px; font-size:13px; }
   }
 </style>
 </head>
 <body>
-  <div id="zoomLayer"><div id="book"></div></div>
+  <canvas id="contenedor"></canvas>
+  <div id="ui">
+    <button id="btnPrev">◀</button>
+    <button id="btnNext">▶</button>
+  </div>
+
   <div id="seekdbg" style="display:none;position:fixed;left:0;right:0;bottom:0;max-height:32vh;overflow:auto;background:rgba(10,10,16,.92);color:#7CFC9A;font:11px/1.3 monospace;padding:6px 9px;z-index:99998;border-top:2px solid #2aa3ef"></div>
   <script>
   window.__SDBG = (location.search.indexOf('debug=1')>=0);
@@ -312,11 +249,10 @@
   </script>
 
   <div id="errbox" style="display:none;position:fixed;inset:0;background:#1a1a22;color:#e6c878;font-family:monospace;padding:30px;z-index:99999;overflow:auto;white-space:pre-wrap;font-size:14px"></div>
-
   <script>
   window.onerror=function(m,s,l,c,e){var b=document.getElementById('errbox');b.style.display='block';b.textContent='⚠ ERROR\n\n'+m+'\n'+s+'  L'+l+':'+c+'\n\n'+(e&&e.stack?e.stack:'');return false;};
   </script>
-  <script src="/lib/page-flip.browser.js"></script>
+  <script src="/lib/three.min.js"></script>
 
   <!-- ===== Reproductor audio/video (iPod) ===== -->
   <div class="ipod" id="player">
@@ -384,22 +320,10 @@
   const FALLBACK_DATA = {
     audioCover: "media/audio_cover.jpg",
     pages: [
-      { src:"pages/portada.jpg", hard:true, hotspots:[] },
-      { src:"pages/p2.jpg", hotspots:[
-        { tipo:"video", src:"media/demo_video.mp4", x:18,y:22,w:64,h:34, titulo:"Mi reel visual", subtitulo:"Producción audiovisual" }
-      ]},
-      { src:"pages/p3.jpg", hotspots:[
-        { tipo:"audio", src:"media/demo_audio.mp3", x:25,y:60,w:50,h:14, titulo:"Demo instrumental", subtitulo:"Producción musical" }
-      ]},
-      { src:"pages/p4.jpg", hotspots:[
-        { tipo:"imagen", src:"media/demo_imagen.jpg", x:20,y:25,w:60,h:40, titulo:"Pieza gráfica", subtitulo:"Diseño" }
-      ]},
-      { src:"pages/p5.jpg", hotspots:[] },
-      { src:"pages/p6.jpg", hotspots:[
-        { tipo:"video", src:"media/demo_video.mp4", x:30,y:30,w:40,h:30, titulo:"Segundo clip", subtitulo:"Motion" }
-      ]},
-      { src:"pages/p7.jpg", hotspots:[] },
-      { src:"pages/contraportada.jpg", hard:true, hotspots:[] }
+      { src:"pages/portada.jpg", hotspots:[] },
+      { src:"pages/p2.jpg", hotspots:[] },
+      { src:"pages/p3.jpg", hotspots:[] },
+      { src:"pages/contraportada.jpg", hotspots:[] }
     ]
   };
 
@@ -414,13 +338,8 @@
         if(pv){ DATA=JSON.parse(pv); start(); return; }
       }catch(e){}
     }
-    // Busca el JSON junto al index.html actual.
-    // Ejemplos:
-    //   /                -> /portafolio.json
-    //   /musica/         -> /musica/portafolio.json
-    //   /visual/         -> /visual/portafolio.json
+    // Busca el JSON junto al index.html actual (/, /musica/, /visual/…)
     const jsonUrl = new URL('portafolio.json', window.location.href);
-
     fetch(jsonUrl.href, {cache:'no-store'})
       .then(r=>{ if(!r.ok) throw new Error('sin json: '+jsonUrl.pathname); return r.json(); })
       .then(json=>{ DATA = json; start(); })
@@ -429,166 +348,707 @@
 
   function start(){
    try {
-    if(typeof St==='undefined'||!St.PageFlip){ document.getElementById('errbox').style.display='block'; document.getElementById('errbox').textContent='La librería page-flip no se cargó.'; return; }
+    if(typeof THREE==='undefined'){ const b=document.getElementById('errbox'); b.style.display='block'; b.textContent='La librería three.js no se cargó.'; return; }
 
-    let flipping=false;
-    let mz=1, mx=0, my=0;   // zoom de la revista (escala y traslación)
-    const RATIO=1.414;
-    const bookEl=document.getElementById('book');
-
-    // Fondo personalizable: color (#hex / css) o imagen (ruta).
+    /* ---------- Fondo personalizable: color o imagen ---------- */
     if(DATA.background){
       const bg=DATA.background;
       if(bg.tipo==='imagen' && bg.valor){
-        // Sin "fixed": en móvil, background-attachment:fixed provoca que el
-        // navegador recalcule/parpadee (efecto de "zoom" momentáneo) al
-        // interactuar con la página (p.ej. al pasar de hoja). El body no
-        // hace scroll (overflow:hidden), así que "fixed" no aporta nada.
         document.body.style.background='#15151c url("'+bg.valor+'") center/cover no-repeat';
       } else if(bg.tipo==='color' && bg.valor){
         document.body.style.background=bg.valor;
       }
     }
 
-    // Detectar móvil: pantalla estrecha o dispositivo táctil vertical
     const isMobile = window.matchMedia('(max-width: 820px)').matches;
 
-    let pageW, pageH;
-    if(isMobile){
-      // UNA página: ocupa casi todo el ancho disponible
-      const availW = Math.min(window.innerWidth - 20, 520);
-      const availH = window.innerHeight - 20;
-      pageW = availW;
-      pageH = Math.round(pageW * RATIO);
-      if(pageH > availH){ pageH = availH; pageW = Math.round(pageH / RATIO); }
-    } else {
-      // DOBLE página (escritorio)
-      const maxH = Math.min(window.innerHeight - 40, 760);
-      pageH = maxH;
-      pageW = Math.round(pageH / RATIO);
+    /* ============================================================
+       CONFIGURACIÓN 3D
+    ============================================================ */
+    // Proporción de página A4 (igual que los archivos de /pages: 1191x1684)
+    const IMG_W = 1191, IMG_H = 1684;
+    const ALTO_PAGINA = 5;
+    const ANCHO_PAGINA = ALTO_PAGINA * (IMG_W/IMG_H);
+    const SEGMENTOS = isMobile ? 80 : 160;
+    const DURACION = 1400;
+
+    /* ---------- Escena, cámara, render ---------- */
+    const canvas = document.getElementById('contenedor');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+    renderer.shadowMap.enabled = false;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+    camera.position.set(0, 0.4, 13);
+    camera.lookAt(0, 0, 0);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+    const luz = new THREE.DirectionalLight(0xffffff, 0.75);
+    luz.position.set(-3.5, 15, 9);
+    luz.shadow.mapSize.set(2048,2048);
+    luz.shadow.radius = 7;
+    luz.shadow.camera.near=1; luz.shadow.camera.far=40;
+    luz.shadow.camera.left=-10; luz.shadow.camera.right=10;
+    luz.shadow.camera.top=10; luz.shadow.camera.bottom=-10;
+    scene.add(luz);
+
+    /* ---------- Cámara: encuadre + zoom ---------- */
+    let fitDist = 13;      // distancia a la que el libro abierto cabe en pantalla
+    let zoomF = 1;         // 1 = encuadre completo; <1 = acercado
+    let camPanX = 0, camPanY = 0;
+    const ZMIN = 0.3;
+    function aplicarCamara(){
+      const lim = (1 - zoomF) * ANCHO_PAGINA * 2;
+      camPanX = Math.max(-lim, Math.min(lim, camPanX));
+      camPanY = Math.max(-lim, Math.min(lim, camPanY));
+      if(zoomF>=1){ camPanX=0; camPanY=0; }
+      camera.position.x = camPanX;
+      camera.position.y = 0.4 + camPanY;
+      camera.position.z = fitDist * zoomF;
     }
+    function ajustar(){
+      const w=innerWidth, h=innerHeight;
+      renderer.setSize(w,h,false);
+      camera.aspect=w/h; camera.updateProjectionMatrix();
+      const fov = camera.fov*Math.PI/180;
+      const margen = 1.12;
+      const distAlto  = (ALTO_PAGINA/2*margen)/Math.tan(fov/2);
+      const distAncho = (ANCHO_PAGINA*margen)/(Math.tan(fov/2)*camera.aspect);
+      fitDist = Math.max(distAlto, distAncho);
+      aplicarCamara();
+    }
+    addEventListener('resize', ajustar); ajustar();
 
-    const pageFlip=new St.PageFlip(bookEl,{
-      width:pageW,height:pageH,size:"fixed",
-      minWidth:200,maxWidth:2000,minHeight:300,maxHeight:2400,
-      maxShadowOpacity:0.5,showCover:true,
-      mobileScrollSupport:false,
-      usePortrait:isMobile,                 // una sola página en móvil
-      flippingTime:700,drawShadow:true,
-      // En móvil: la librería NO maneja gestos (los controlamos nosotros con tap).
-      // En escritorio: mantiene el arrastre de esquina natural.
-      useMouseEvents:!isMobile,
-      swipeDistance:30,
-      disableFlipByClick:true, clickEventForward:true
-    });
-
-    const elements=DATA.pages.map((p,idx)=>{
-      const d=document.createElement('div');
-      d.className='page'+(p.hard?' page-hard':'');
-      if(p.hard) d.setAttribute('data-density','hard');
-      if(p.src){ const im=document.createElement('img'); im.src=p.src; im.className='pageimg'; im.draggable=false; d.appendChild(im); }
-      // Capa de efecto 3D (lomo + curvatura). Página par = derecha, impar = izquierda.
-      if(!isMobile){
-        const fx=document.createElement('div');
-        fx.className='page-fx '+(idx%2===0?'right':'left');
-        d.appendChild(fx);
-      }
-      (p.hotspots||[]).forEach(hs=>{
-        const z=document.createElement('div');
-        z.className='hotspot';
-        z.style.left=hs.x+'%'; z.style.top=hs.y+'%'; z.style.width=hs.w+'%'; z.style.height=hs.h+'%';
-        const icon=hs.tipo==='video'?'▶ Video':hs.tipo==='audio'?'♪ Audio':hs.tipo==='enlace'?'🔗 Enlace':'🖼 Imagen';
-        z.innerHTML='<span class="badge">'+icon+'</span>';
-        const fire=(ev)=>{
-          ev.stopPropagation(); 
-          if(flipping||mz>1){ return; }
-          if(hs.tipo==='enlace'){
-            if(hs.src) window.open(hs.src, '_blank', 'noopener');
-          } else {
-            openMedia(hs);
-          }
-        };
-        z.addEventListener('click', fire);
-        // Escritorio: evitar que el doblez (peel) se active al pasar el cursor
-        // sobre un hotspot. El peel se dispara con mousemove cerca de la esquina;
-        // mientras el cursor esté sobre el hotspot, "engañamos" a la librería
-        // enviándole un mousemove en el centro del libro (lejos de las esquinas),
-        // y bloqueamos el mousedown para que no inicie el arrastre.
-        if(!isMobile){
-          z.addEventListener('mousedown',(e)=>{ e.stopPropagation(); }, true);
-          const feedCenter=(e)=>{
-            if(e.__synthetic) return;
-            e.stopPropagation();
-            const r=bookEl.getBoundingClientRect();
-            const ev=new MouseEvent('mousemove',{
-              clientX:r.left+r.width/2, clientY:r.top+r.height/2, bubbles:true
-            });
-            ev.__synthetic=true;
-            bookEl.dispatchEvent(ev);
-          };
-          z.addEventListener('mouseenter', feedCenter, true);
-          z.addEventListener('mousemove', feedCenter, true);
-        }
-        // En móvil, un tap limpio sobre el hotspot lo activa de forma fiable
-        let hsx=0,hsy=0,ht=0;
-        z.addEventListener('touchstart',(e)=>{ const t=e.touches[0]; hsx=t.clientX; hsy=t.clientY; ht=Date.now(); e.stopPropagation(); },{passive:true});
-        z.addEventListener('touchend',(e)=>{
-          const t=e.changedTouches[0];
-          const moved=Math.hypot(t.clientX-hsx,t.clientY-hsy);
-          if(moved<18 && Date.now()-ht<400){ e.preventDefault(); fire(e); }
-        });
-        d.appendChild(z);
+    /* ---------- Texturas ---------- */
+    const loader = new THREE.TextureLoader();
+    function texturaLisa(color){
+      const c=document.createElement('canvas'); c.width=8; c.height=8;
+      const g=c.getContext('2d'); g.fillStyle=color; g.fillRect(0,0,8,8);
+      const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+    }
+    function cargarTextura(url){
+      return new Promise((res)=>{
+        if(!url){ res(texturaLisa('#f4f2ee')); return; }
+        loader.load(url,
+          (t)=>{ t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; res(t); },
+          undefined,
+          ()=>{ // sustituto si falla la carga
+            const c=document.createElement('canvas'); c.width=620; c.height=877;
+            const g=c.getContext('2d'); g.fillStyle='#bdbdbd'; g.fillRect(0,0,c.width,c.height);
+            g.fillStyle='#555'; g.font='24px system-ui'; g.fillText(url,20,50);
+            const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; res(t);
+          });
       });
-      return d;
-    });
-    pageFlip.loadFromHTML(elements);
+    }
 
-    /* ---- Animación de apertura (solo escritorio): portada centrada ---- */
-    // Cuando la revista está cerrada en la portada, se desplaza media hoja a la
-    // derecha para quedar centrada. Al abrir, vuelve a su sitio con transición.
-    function updateCoverCentering(){
-      if(isMobile){ bookEl.classList.remove('cover-centered'); return; }
-      const idx = pageFlip.getCurrentPageIndex();
-      const total = pageFlip.getPageCount();
-      const onCover = idx===0;
-      const onBack  = idx===total-1;
-      if(onCover){
-        // portada sola a la derecha → mover el conjunto a la izquierda para centrarla
-        bookEl.style.setProperty('--cover-shift', (-pageW/2)+'px');
-        bookEl.classList.add('cover-centered');
-      } else if(onBack){
-        // contraportada sola a la izquierda → mover a la derecha para centrarla
-        bookEl.style.setProperty('--cover-shift', (pageW/2)+'px');
-        bookEl.classList.add('cover-centered');
+    /* ============================================================
+       HOJA FÍSICA
+       Geometría anclada en el lomo (x=0) extendiéndose a x=+ANCHO.
+       rotation efectiva 0 -> hoja a la DERECHA (vemos su FRENTE).
+       rotation efectiva PI -> hoja a la IZQUIERDA (vemos su DORSO).
+    ============================================================ */
+    class Hoja {
+      constructor(texFrente, texDorso){
+        const geo = new THREE.PlaneGeometry(ANCHO_PAGINA, ALTO_PAGINA, SEGMENTOS, SEGMENTOS);
+        geo.translate(ANCHO_PAGINA/2, 0, 0);   // pivote en el lomo
+        this.baseX = []; this.baseY = [];
+        const pos = geo.attributes.position;
+        for (let i=0;i<pos.count;i++){ this.baseX.push(pos.getX(i)); this.baseY.push(pos.getY(i)); }
+
+        // El dorso se ve "desde atrás" de la malla: invertimos la U de su
+        // textura para que el contenido se lea al derecho.
+        texDorso.wrapS = THREE.RepeatWrapping;
+        texDorso.repeat.x = -1;
+        texDorso.offset.x = 1;
+        // Acabado plastificado de revista: clearcoat = barniz satinado.
+        const matF = new THREE.MeshPhysicalMaterial({
+          map:texFrente, roughness:.38, metalness:0,
+          clearcoat:.85, clearcoatRoughness:.25, side:THREE.FrontSide });
+        const matD = new THREE.MeshPhysicalMaterial({
+          map:texDorso, roughness:.38, metalness:0,
+          clearcoat:.85, clearcoatRoughness:.25, side:THREE.BackSide });
+
+        this.geo = geo;
+        this.mF = new THREE.Mesh(geo, matF);
+        this.mD = new THREE.Mesh(geo, matD);
+        [this.mF,this.mD].forEach(m=>{ m.castShadow=true; m.receiveShadow=true; });
+
+        this.grupo = new THREE.Group();
+        this.grupo.add(this.mF); this.grupo.add(this.mD);
+        this.angulo = 0;
+        this.deformar(0,0);
+      }
+
+      // Curvatura de reposo: canal que se hunde hacia el lomo.
+      static zCanal(t){ return -0.55 * Math.pow(1 - t, 2.0); }
+
+      // Volteo completo: rota cada vértice alrededor del lomo.
+      deformar(ang, curv){
+        const pos = this.geo.attributes.position;
+        for (let i=0;i<pos.count;i++){
+          const d = this.baseX[i];
+          const t = d / ANCHO_PAGINA;
+          const X = Math.cos(ang) * d;
+          let Z = Math.sin(ang) * d;
+          Z += Math.sin(t*Math.PI) * curv;
+          Z += Hoja.zCanal(t);
+          pos.setX(i, X);
+          pos.setY(i, this.baseY[i]);
+          pos.setZ(i, Z);
+        }
+        pos.needsUpdate = true;
+        this.geo.computeVertexNormals();
+      }
+
+      // Pliegue de ESQUINA con reflexión real (page peel).
+      doblarEsquina(esquinaY, ox, oy, alza){
+        const pos = this.geo.attributes.position;
+        const halfH = ALTO_PAGINA/2;
+        const ang = this.angulo;
+        const lado = Math.cos(ang) >= 0 ? 1 : -1;
+        const Cx = lado * ANCHO_PAGINA, Cy = esquinaY * halfH;
+        let Tx = Cx + ox, Ty = Cy + oy;
+
+        // Restricción física: la punta no puede alejarse del lomo más de lo
+        // que mide la hoja (dos círculos de restricción).
+        const S1x = 0, S1y = Cy;
+        const S2x = 0, S2y = -Cy;
+        const r1 = ANCHO_PAGINA;
+        const r2 = Math.hypot(ANCHO_PAGINA, ALTO_PAGINA);
+        for (let pasada = 0; pasada < 2; pasada++){
+          let vx = Tx - S1x, vy = Ty - S1y, L = Math.hypot(vx, vy);
+          if (L > r1){ Tx = S1x + vx*r1/L; Ty = S1y + vy*r1/L; }
+          vx = Tx - S2x; vy = Ty - S2y; L = Math.hypot(vx, vy);
+          if (L > r2){ Tx = S2x + vx*r2/L; Ty = S2y + vy*r2/L; }
+        }
+
+        const dx = Tx - Cx, dy = Ty - Cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 0.01){ this.plano(); return; }
+
+        const nx = dx / dist, ny = dy / dist;
+        const Mx = (Cx + Tx) / 2, My = (Cy + Ty) / 2;
+
+        for (let i=0;i<pos.count;i++){
+          const d = this.baseX[i];
+          const y = this.baseY[i];
+          const Xb = Math.cos(ang) * d;
+          const s = (Xb - Mx)*nx + (y - My)*ny;
+          const EPS = (ANCHO_PAGINA / SEGMENTOS) * 2;
+          if (s < 0){
+            const rampa = Math.min(1, -s / EPS);
+            pos.setX(i, Xb - 2*s*nx);
+            pos.setY(i, y  - 2*s*ny);
+            pos.setZ(i, (alza + Math.min(0.15, -s*0.05)) * rampa);
+          } else {
+            pos.setX(i, Xb);
+            pos.setY(i, y);
+            pos.setZ(i, Hoja.zCanal(d / ANCHO_PAGINA));
+          }
+        }
+        pos.needsUpdate = true;
+        this.geo.computeVertexNormals();
+      }
+
+      plano(){ this.deformar(this.angulo, 0); }
+    }
+
+    /* ============================================================
+       LIBRO: construcción, apilado y volteo
+    ============================================================ */
+    const btnPrev = document.getElementById('btnPrev');
+    const btnNext = document.getElementById('btnNext');
+
+    let hojas = [];
+    let volteadas = 0;      // nº de hojas ya pasadas (0 = cerrada en portada)
+    let animando = false;
+    let mediaOpen = false;  // true mientras un reproductor/visor está abierto
+
+    // Contenedor de todas las hojas: se desliza para centrar la hoja única
+    // cuando la revista está cerrada (portada o contraportada).
+    const libro = new THREE.Group();
+    scene.add(libro);
+    let offsetObjetivo = 0;
+    function actualizarCentrado(){
+      if (volteadas === 0)                offsetObjetivo = -ANCHO_PAGINA/2;
+      else if (volteadas >= hojas.length) offsetObjetivo =  ANCHO_PAGINA/2;
+      else                                offsetObjetivo = 0;
+    }
+
+    async function construir(){
+      const tex = [];
+      for (const p of DATA.pages) tex.push(await cargarTextura(p.src));
+      if (tex.length % 2) tex.push(texturaLisa('#f4f2ee'));  // dorso en blanco si nº impar
+
+      for (let i=0; i<tex.length; i+=2){
+        const h = new Hoja(tex[i], tex[i+1]);
+        libro.add(h.grupo);
+        hojas.push(h);
+      }
+      reapilar();
+      actualizarEstado();
+      animar();
+    }
+
+    // Solo es visible el PLIEGO ACTIVO:
+    //   izquierda = hoja (volteadas-1) mostrando su DORSO   (ángulo PI)
+    //   derecha   = hoja (volteadas)   mostrando su FRENTE  (ángulo 0)
+    function reapilar(exceptoIndice=-1){
+      const izq = volteadas - 1;
+      const der = volteadas;
+      hojas.forEach((h, i)=>{
+        if (i === exceptoIndice){ h.grupo.visible = true; return; }
+        if (i === izq){
+          h.angulo = Math.PI; h.deformar(Math.PI, 0);
+          h.grupo.position.z = 0;
+          h.grupo.visible = true;
+        } else if (i === der){
+          h.angulo = 0; h.deformar(0, 0);
+          h.grupo.position.z = 0;
+          h.grupo.visible = true;
+        } else {
+          h.grupo.visible = false;
+        }
+      });
+    }
+
+    function actualizarEstado(){
+      actualizarCentrado();
+      btnPrev.disabled = animando || volteadas === 0;
+      btnNext.disabled = animando || volteadas >= hojas.length;
+    }
+
+    function voltear(dir){
+      if (animando) return;
+      if (mediaOpen && isMobile) return;
+      const idx = dir > 0 ? volteadas : volteadas - 1;
+      const h = hojas[idx];
+      if (!h) return;
+      animando = true; actualizarEstado();
+      prepararVuelo(dir);
+
+      const desde = dir > 0 ? 0 : Math.PI;
+      const hasta = dir > 0 ? Math.PI : 0;
+      const t0 = performance.now();
+
+      function paso(now){
+        let p = Math.min((now - t0)/DURACION, 1);
+        const e = p<0.5 ? 2*p*p : 1 - Math.pow(-2*p+2,2)/2;
+        const ang = desde + (hasta - desde)*e;
+        aplicarAngulo(h, ang);
+        if (p < 1) requestAnimationFrame(paso);
+        else {
+          h.deformar(hasta, 0); h.angulo = hasta;
+          h.grupo.position.z = 0;
+          volteadas += dir;
+          reapilar();
+          animando = false;
+          actualizarEstado();
+        }
+      }
+      requestAnimationFrame(paso);
+    }
+
+    // Prepara la visibilidad de las hojas del pliego para un vuelo en dirección dir.
+    function prepararVuelo(dir){
+      const volteadasDestino = volteadas + dir;
+      hojas.forEach(x => x.grupo.visible = false);
+      if (dir > 0){
+        const der = hojas[volteadasDestino];
+        if (der){ der.grupo.visible = true; der.deformar(0,0); der.angulo=0; der.grupo.position.z = 0; }
+        const izqOrigen = hojas[volteadas - 1];
+        if (izqOrigen){ izqOrigen.grupo.visible = true; izqOrigen.deformar(Math.PI,0); izqOrigen.angulo=Math.PI; izqOrigen.grupo.position.z = 0; }
       } else {
-        bookEl.classList.remove('cover-centered');
+        const izq = hojas[volteadasDestino - 1];
+        if (izq){ izq.grupo.visible = true; izq.deformar(Math.PI,0); izq.angulo=Math.PI; izq.grupo.position.z = 0; }
+        const derOrigen = hojas[volteadas];
+        if (derOrigen){ derOrigen.grupo.visible = true; derOrigen.deformar(0,0); derOrigen.angulo=0; derOrigen.grupo.position.z = 0; }
+      }
+      const idx = dir > 0 ? volteadas : volteadas - 1;
+      const h = hojas[idx];
+      if (h) h.grupo.visible = true;
+    }
+
+    // Aplica un ángulo intermedio a la hoja h con el bombeo proporcional.
+    function aplicarAngulo(h, ang){
+      const arco = Math.sin(ang);
+      const curv = Math.abs(arco) * 0.4;
+      h.deformar(ang, curv);
+      h.angulo = ang;
+      h.grupo.position.z = 0.04;
+    }
+
+    btnNext.addEventListener('click', ()=>voltear(+1));
+    btnPrev.addEventListener('click', ()=>voltear(-1));
+
+    /* ============================================================
+       HIT-TESTING: punto del cursor -> página y coordenadas %
+    ============================================================ */
+    const raycaster = new THREE.Raycaster();
+    const mouseNDC = new THREE.Vector2();
+    const planoRef = new THREE.Plane(new THREE.Vector3(0,0,1), 0); // plano z=0
+    const puntoRef = new THREE.Vector3();
+
+    function actualizarNDC(clientX, clientY){
+      const r = canvas.getBoundingClientRect();
+      mouseNDC.x = ((clientX - r.left) / r.width) * 2 - 1;
+      mouseNDC.y = -((clientY - r.top) / r.height) * 2 + 1;
+    }
+
+    // Punto del cursor proyectado sobre el plano del libro (coords del libro).
+    function puntoEnLibro(){
+      raycaster.setFromCamera(mouseNDC, camera);
+      if (!raycaster.ray.intersectPlane(planoRef, puntoRef)) return null;
+      const x = puntoRef.x - libro.position.x, y = puntoRef.y;
+      const halfH = ALTO_PAGINA/2;
+      if (Math.abs(x) > ANCHO_PAGINA || Math.abs(y) > halfH) return null;
+      return { x, y };
+    }
+
+    // Página visible bajo el punto y coordenadas en % de esa página.
+    // Página derecha = DATA.pages[2*volteadas]; izquierda = DATA.pages[2*volteadas-1].
+    function paginaBajoPunto(pt){
+      let pageIdx, xpct;
+      if (pt.x >= 0){
+        if (volteadas >= hojas.length) return null;   // no hay página derecha
+        pageIdx = 2*volteadas;
+        xpct = pt.x / ANCHO_PAGINA * 100;
+      } else {
+        if (volteadas <= 0) return null;              // no hay página izquierda
+        pageIdx = 2*volteadas - 1;
+        xpct = (pt.x + ANCHO_PAGINA) / ANCHO_PAGINA * 100;
+      }
+      const ypct = (ALTO_PAGINA/2 - pt.y) / ALTO_PAGINA * 100;
+      const page = DATA.pages[pageIdx];
+      if (!page) return null;
+      return { page, pageIdx, xpct, ypct };
+    }
+
+    // Hotspot de la página visible bajo el cursor (o null).
+    function hotspotBajoCursor(){
+      const pt = puntoEnLibro();
+      if (!pt) return null;
+      const pg = paginaBajoPunto(pt);
+      if (!pg) return null;
+      for (const hs of (pg.page.hotspots||[])){
+        if (pg.xpct>=hs.x && pg.xpct<=hs.x+hs.w && pg.ypct>=hs.y && pg.ypct<=hs.y+hs.h) return hs;
+      }
+      return null;
+    }
+
+    // Activa un hotspot: enlace externo o reproductor/visor.
+    function fireHotspot(hs){
+      if (animando) return;
+      if (hs.tipo==='enlace'){
+        if (hs.src) window.open(hs.src, '_blank', 'noopener');
+      } else {
+        openMedia(hs);
       }
     }
-    // primer centrado sin animación (evita un salto al cargar)
-    bookEl.style.transition='none';
-    updateCoverCentering();
-    requestAnimationFrame(()=>{ bookEl.style.transition=''; });
-    pageFlip.on('flip', updateCoverCentering);
 
-    /* ---- candado de animación + navegación ---- */
-    let mediaOpen=false;   // true mientras un reproductor/visor está abierto
-    document.addEventListener('keydown',(e)=>{
-      if(flipping||(mediaOpen&&isMobile))return;
-      if(e.key==='ArrowRight')pageFlip.flipNext();
-      if(e.key==='ArrowLeft')pageFlip.flipPrev();
+    /* ============================================================
+       INTERACCIÓN: pliegue de esquina (escritorio)
+    ============================================================ */
+    const FRAC_ESQUINA = 0.38;
+
+    let arrastrando = false;
+    let dirArrastre = 0;
+    let hojaArrastre = null;
+    let esquinaYArrastre = 1;
+    let hojaPreview = null;
+
+    // Detecta si el cursor está sobre la franja de una ESQUINA volteable.
+    function esquinaBajoCursor(){
+      const pt = puntoEnLibro();
+      if (!pt) return null;
+      const x = pt.x, y = pt.y;
+      const halfH = ALTO_PAGINA/2;
+
+      const lado = x >= 0 ? +1 : -1;
+      const fx = Math.abs(x) / ANCHO_PAGINA;
+      const fyTop = (y + halfH)/ALTO_PAGINA;
+      const fyBot = (halfH - y)/ALTO_PAGINA;
+      const esquinaY = fyTop > fyBot ? 1 : -1;
+      const fyEsq = Math.max(fyTop, fyBot);
+
+      if (fx <= (1 - FRAC_ESQUINA) || fyEsq <= (1 - FRAC_ESQUINA)) return null;
+
+      let dir, h;
+      if (lado > 0){ if (volteadas >= hojas.length) return null; dir=+1; h=hojas[volteadas]; }
+      else         { if (volteadas <= 0)             return null; dir=-1; h=hojas[volteadas-1]; }
+
+      const frac = Math.min(1, ((fx-(1-FRAC_ESQUINA)) + (fyEsq-(1-FRAC_ESQUINA))) / FRAC_ESQUINA);
+      return { h, dir, esquinaY, frac, px:x, py:y };
+    }
+
+    let hojaDebajo = null;
+    function mostrarDebajo(dir){
+      ocultarDebajo();
+      if (dir > 0 && hojas[volteadas+1]){
+        hojaDebajo = hojas[volteadas+1];
+        hojaDebajo.angulo = 0; hojaDebajo.deformar(0,0);
+        hojaDebajo.grupo.position.z = -0.02; hojaDebajo.grupo.visible = true;
+      } else if (dir < 0 && hojas[volteadas-2]){
+        hojaDebajo = hojas[volteadas-2];
+        hojaDebajo.angulo = Math.PI; hojaDebajo.deformar(Math.PI,0);
+        hojaDebajo.grupo.position.z = -0.02; hojaDebajo.grupo.visible = true;
+      }
+    }
+    function ocultarDebajo(){
+      if (hojaDebajo){ hojaDebajo.grupo.visible = false; hojaDebajo.grupo.position.z = 0; hojaDebajo = null; }
+    }
+
+    let pliegue = null;
+    let animDesdoble = null;
+
+    function aplicarPliegue(h, esquinaY, ox, oy, alza){
+      pliegue = { h, esquinaY, ox, oy, alza };
+      h.grupo.position.z = 0.04;
+      h.doblarEsquina(esquinaY, ox, oy, alza);
+    }
+
+    // Desdoble suave (~0.5s) al salir de la zona activa.
+    let hojaDesdoblando = null;
+    function desdoblarSuave(){
+      if (!pliegue || animDesdoble) return;
+      const p0 = { ...pliegue };
+      pliegue = null;
+      hojaDesdoblando = p0.h;
+      const t0 = performance.now(); const dur = 500;
+      function paso(now){
+        const p = Math.min((now - t0)/dur, 1);
+        const f = Math.pow(1-p, 3);
+        p0.h.doblarEsquina(p0.esquinaY, p0.ox*f, p0.oy*f, p0.alza*f);
+        if (p < 1) animDesdoble = requestAnimationFrame(paso);
+        else {
+          p0.h.plano(); p0.h.grupo.position.z = 0;
+          hojaDesdoblando = null; animDesdoble = null;
+          ocultarDebajo();
+        }
+      }
+      animDesdoble = requestAnimationFrame(paso);
+    }
+
+    function cancelarDesdoble(){
+      if (animDesdoble){ cancelAnimationFrame(animDesdoble); animDesdoble = null; }
+      if (hojaDesdoblando){
+        hojaDesdoblando.plano(); hojaDesdoblando.grupo.position.z = 0;
+        hojaDesdoblando = null;
+      }
+    }
+
+    function limpiarPreview(){ desdoblarSuave(); hojaPreview = null; }
+
+    /* ---------- pan de cámara con zoom (escritorio) ---------- */
+    let paneando=false, panSX=0, panSY=0, panBX=0, panBY=0, panMovio=false;
+
+    canvas.addEventListener('mousemove', (ev)=>{
+      actualizarNDC(ev.clientX, ev.clientY);
+      if (paneando){
+        // arrastre de cámara: la escena sigue al cursor
+        const esc = (fitDist*zoomF) * Math.tan(camera.fov*Math.PI/360) * 2 / innerHeight;
+        camPanX = panBX - (ev.clientX - panSX)*esc;
+        camPanY = panBY + (ev.clientY - panSY)*esc;
+        if (Math.abs(ev.clientX-panSX)+Math.abs(ev.clientY-panSY) > 4) panMovio=true;
+        aplicarCamara();
+        return;
+      }
+      if (arrastrando){
+        const r = canvas.getBoundingClientRect();
+        const fx = (ev.clientX - r.left) / r.width;
+        let ang = (1 - fx) * Math.PI;
+        ang = Math.max(0, Math.min(Math.PI, ang));
+        aplicarAngulo(hojaArrastre, ang);
+        return;
+      }
+      if (animando) return;
+      // Hotspot bajo el cursor: prioridad sobre el pliegue de esquina.
+      const hs = hotspotBajoCursor();
+      if (hs){
+        canvas.style.cursor = 'pointer';
+        limpiarPreview();
+        return;
+      }
+      const c = esquinaBajoCursor();
+      if (c){
+        cancelarDesdoble();
+        canvas.style.cursor = 'grab';
+        if (pliegue && pliegue.h !== c.h){
+          pliegue.h.plano(); pliegue.h.grupo.position.z = 0;
+          pliegue = null; ocultarDebajo();
+        }
+        hojaPreview = c.h;
+        mostrarDebajo(c.dir);
+        const lado = c.dir > 0 ? 1 : -1;
+        const puntaX = lado * ANCHO_PAGINA;
+        const puntaY = c.esquinaY * (ALTO_PAGINA/2);
+        let ox = c.px - puntaX;
+        let oy = c.py - puntaY;
+        const dist = Math.hypot(ox, oy);
+        const maxD = ANCHO_PAGINA * 1.9;
+        if (dist > maxD){ ox *= maxD/dist; oy *= maxD/dist; }
+        aplicarPliegue(c.h, c.esquinaY, ox, oy, 0.06);
+      } else {
+        canvas.style.cursor = zoomF<1 ? 'grab' : 'default';
+        limpiarPreview();
+      }
     });
-    pageFlip.on('changeState',(e)=>{ flipping=(e.data==='flipping'||e.data==='user_fold'); });
-    // Bloqueo del libro: en MÓVIL si hay reproductor abierto; en cualquier caso durante animación.
-    ['mousedown','mousemove','click','touchstart','mouseover'].forEach(evt=>{
-      bookEl.addEventListener(evt,(ev)=>{
-        if(mediaOpen&&isMobile){ ev.stopPropagation(); return; }
-        if(flipping&&!ev.target.closest('.hotspot')){ ev.stopPropagation();ev.preventDefault(); }
-      },true);
+
+    let downX = 0, downY = 0;
+    canvas.addEventListener('mousedown', (ev)=>{
+      downX = ev.clientX; downY = ev.clientY;
+      if (animando) return;
+      actualizarNDC(ev.clientX, ev.clientY);
+      if (hotspotBajoCursor()) return;         // el click abrirá el hotspot
+      const c = esquinaBajoCursor();
+      if (!c){
+        if (zoomF < 1){                        // con zoom: arrastrar = pan
+          paneando = true; panMovio=false;
+          panSX=ev.clientX; panSY=ev.clientY; panBX=camPanX; panBY=camPanY;
+          canvas.style.cursor='grabbing';
+        }
+        return;
+      }
+      cancelarDesdoble();
+      if (pliegue){ pliegue.h.plano(); pliegue.h.grupo.position.z = 0; pliegue = null; }
+      hojaPreview = null; ocultarDebajo();
+      arrastrando = true; animando = true;
+      dirArrastre = c.dir; hojaArrastre = c.h; esquinaYArrastre = c.esquinaY;
+      prepararVuelo(c.dir);
+      canvas.style.cursor = 'grabbing';
+      actualizarEstado();
     });
-    bookEl.addEventListener('click',(ev)=>{
-      if(flipping||(mediaOpen&&isMobile))return;
-      if(ev.target.closest('.hotspot'))return;
-      if(pageFlip.getCurrentPageIndex()===0) pageFlip.flipNext();
+
+    window.addEventListener('mouseup', (ev)=>{
+      if (paneando){ paneando=false; canvas.style.cursor = zoomF<1?'grab':'default'; return; }
+      if (!arrastrando) return;
+      arrastrando = false; canvas.style.cursor = 'default';
+      // CLIC (casi sin movimiento) -> completar el volteo directamente.
+      const fueClic = Math.hypot(ev.clientX - downX, ev.clientY - downY) < 8;
+      let completar;
+      if (fueClic){
+        completar = true;
+      } else {
+        const ang = hojaArrastre.angulo;
+        const pasoMitad = ang > Math.PI/2;
+        completar = dirArrastre > 0 ? pasoMitad : !pasoMitad;
+      }
+      finalizarArrastre(completar);
+    });
+
+    function finalizarArrastre(completar){
+      const h = hojaArrastre;
+      const desde = h.angulo;
+      let hasta;
+      if (dirArrastre > 0) hasta = completar ? Math.PI : 0;
+      else                 hasta = completar ? 0 : Math.PI;
+      const t0 = performance.now(); const dur = 650;
+      function paso(now){
+        let p = Math.min((now - t0)/dur, 1);
+        const e = 1 - Math.pow(1-p, 3);
+        const ang = desde + (hasta - desde)*e;
+        aplicarAngulo(h, ang);
+        if (p < 1) requestAnimationFrame(paso);
+        else {
+          h.deformar(hasta, 0); h.angulo = hasta; h.grupo.position.z = 0;
+          if (completar) volteadas += dirArrastre;
+          reapilar(); animando = false; hojaArrastre = null;
+          actualizarEstado();
+        }
+      }
+      requestAnimationFrame(paso);
+    }
+
+    /* ---------- clic: hotspot o portada ---------- */
+    canvas.addEventListener('click', (ev)=>{
+      if (animando || arrastrando) return;
+      if (panMovio){ panMovio=false; return; }
+      if (Math.hypot(ev.clientX - downX, ev.clientY - downY) >= 8) return;
+      actualizarNDC(ev.clientX, ev.clientY);
+      const hs = hotspotBajoCursor();
+      if (hs){ fireHotspot(hs); return; }
+      // clic sobre la portada cerrada: abrir la revista
+      if (volteadas===0 && puntoEnLibro()) voltear(+1);
+    });
+
+    /* ---------- teclado ---------- */
+    window.addEventListener('keydown', (ev)=>{
+      if (animando) return;
+      if (mediaOpen && isMobile) return;
+      if (ev.key === 'ArrowRight') voltear(+1);
+      else if (ev.key === 'ArrowLeft') voltear(-1);
+    });
+
+    /* ---------- rueda: zoom de la revista (escritorio) ---------- */
+    canvas.addEventListener('wheel',(e)=>{
+      if (mediaOpen) return;
+      e.preventDefault();
+      zoomF = Math.max(ZMIN, Math.min(1, zoomF + e.deltaY*0.0012));
+      aplicarCamara();
+      canvas.style.cursor = zoomF<1 ? 'grab' : 'default';
+    },{passive:false});
+    // doble clic alterna 100% / 200%
+    canvas.addEventListener('dblclick',(e)=>{
+      if (mediaOpen) return;
+      zoomF = zoomF<1 ? 1 : 0.5;
+      camPanX=0; camPanY=0; aplicarCamara();
+    });
+
+    /* ---------- táctil: tap para navegar, pinch para zoom ---------- */
+    let tSX=0, tSY=0, tT=0, tMulti=false;
+    let pinchStart=0, pinchBase=1;
+    let tPan=false, tPanBX=0, tPanBY=0;
+    canvas.addEventListener('touchstart',(e)=>{
+      if (mediaOpen) return;
+      if (e.touches.length>=2){
+        tMulti=true; pinchStart=0;
+        return;
+      }
+      tMulti=false;
+      tSX=e.touches[0].clientX; tSY=e.touches[0].clientY; tT=Date.now();
+      if (zoomF<1){ tPan=true; tPanBX=camPanX; tPanBY=camPanY; }
+    },{passive:true});
+    canvas.addEventListener('touchmove',(e)=>{
+      if (mediaOpen) return;
+      if (e.touches.length>=2){
+        const dx=e.touches[0].clientX-e.touches[1].clientX;
+        const dy=e.touches[0].clientY-e.touches[1].clientY;
+        const dist=Math.hypot(dx,dy);
+        if(!pinchStart){ pinchStart=dist; pinchBase=zoomF; return; }
+        e.preventDefault();
+        zoomF = Math.max(ZMIN, Math.min(1, pinchBase*(pinchStart/dist)));
+        aplicarCamara();
+      } else if (e.touches.length===1 && tPan){
+        e.preventDefault();
+        const esc = (fitDist*zoomF) * Math.tan(camera.fov*Math.PI/360) * 2 / innerHeight;
+        camPanX = tPanBX - (e.touches[0].clientX - tSX)*esc;
+        camPanY = tPanBY + (e.touches[0].clientY - tSY)*esc;
+        aplicarCamara();
+      }
+    },{passive:false});
+    canvas.addEventListener('touchend',(e)=>{
+      if (e.touches.length<2) pinchStart=0;
+      if (e.touches.length>0) return;
+      tPan=false;
+      if (tMulti){ tMulti=false; return; }
+      if (suppressNextClick) return;    // este tap cerró el reproductor
+      if (mediaOpen) return;
+      if (animando) return;
+      const t1=e.changedTouches[0];
+      const moved=Math.hypot(t1.clientX-tSX, t1.clientY-tSY);
+      if (moved>=25 || Date.now()-tT>=600) return;
+      actualizarNDC(t1.clientX, t1.clientY);
+      // evita los eventos de mouse sintéticos del tap (doble disparo)
+      if (e.cancelable) e.preventDefault();
+      // prioridad: hotspot bajo el dedo
+      const hs = hotspotBajoCursor();
+      if (hs){ fireHotspot(hs); return; }
+      if (zoomF<1) return;              // con zoom, el toque es para pan
+      // mitad izquierda = anterior, mitad derecha = siguiente
+      if (t1.clientX > window.innerWidth/2) voltear(+1);
+      else voltear(-1);
     });
 
     /* =========================================================
@@ -615,14 +1075,13 @@
         player.classList.add('video');
         media=document.createElement('video'); media.src=hs.src; media.playsInline=true;
         playerArt.appendChild(media);
-        // ajustar el contenedor a la proporción real del video (vertical u horizontal)
         media.addEventListener('loadedmetadata',()=>{
           if(media.videoWidth && media.videoHeight){
             playerArt.style.aspectRatio = media.videoWidth + ' / ' + media.videoHeight;
           }
         });
       } else {
-        playerArt.style.aspectRatio='';   // audio usa carátula cuadrada
+        playerArt.style.aspectRatio='';
         const img=document.createElement('img'); img.src=DATA.audioCover; img.onerror=()=>{img.style.display='none';playerArt.style.background='radial-gradient(circle,#2aa3ef,#0d2a47)';};
         media=document.createElement('audio'); media.src=hs.src;
         playerArt.appendChild(img); playerArt.appendChild(media);
@@ -633,7 +1092,6 @@
       const vol0=getSavedVolume();
       document.getElementById('vol').value=vol0; media.volume=vol0;
       seek.value=0; seekFill.style.width='0%'; timeCur.textContent='0:00'; timeDur.textContent='-0:00';
-      // los listeners usan 'media' (referencia fija) y comprueban que siga activo
       media.addEventListener('loadedmetadata',()=>{ if(media!==currentMedia)return; timeDur.textContent='-'+fmt(media.duration); });
       media.addEventListener('timeupdate',()=>{
         if(media!==currentMedia)return;
@@ -645,7 +1103,7 @@
       });
       media.addEventListener('seeking',()=>{ slog('EVT seeking ct='+media.currentTime.toFixed(1)); });
       media.addEventListener('seeked',()=>{ if(media!==currentMedia)return; slog('EVT seeked ct='+media.currentTime.toFixed(1)); seeking=false; });
-      centerWin(player); player.classList.add('open'); mediaOpen=true; if(isMobile) bookEl.style.pointerEvents='none';
+      centerWin(player); player.classList.add('open'); mediaOpen=true;
       media.play().catch(()=>{});
     }
     seek.oninput=()=>{ if(!currentMedia)return; seeking=true; const d=currentMedia.duration||0; seekFill.style.width=seek.value+'%'; timeCur.textContent=fmt(d*seek.value/100); };
@@ -657,9 +1115,7 @@
       } else seeking=false;
     }
     seek.onchange=commitSeek;
-    // En móvil, asegurar que al soltar el dedo se aplique la posición
     seek.addEventListener('touchend',(e)=>{ e.stopPropagation(); commitSeek(); },true);
-    seek.addEventListener('pointerup',commitSeek);
     seek.addEventListener('pointerup',commitSeek);
     document.getElementById('btnPlay').onclick=()=>currentMedia&&currentMedia.play();
     document.getElementById('btnPause').onclick=()=>currentMedia&&currentMedia.pause();
@@ -683,17 +1139,16 @@
     const viewerTitle=document.getElementById('viewerTitle');
     const viewerSub=document.getElementById('viewerSub');
     const zoomLabel=document.getElementById('zoomLabel');
-    let zoom=1, ix=0, iy=0;     // zoom y traslación (pan) de la imagen
+    let zoom=1, ix=0, iy=0;
     function openImage(hs){
       imgEl.src=hs.src; zoom=1; ix=0; iy=0; applyZoom();
       viewerTitle.textContent=hs.titulo||'Imagen';
       viewerSub.textContent=hs.subtitulo||'';
-      centerWin(viewer); viewer.classList.add('open'); mediaOpen=true; if(isMobile) bookEl.style.pointerEvents='none';
+      centerWin(viewer); viewer.classList.add('open'); mediaOpen=true;
     }
     function clampImg(){
-      // limita el pan para no perder la imagen fuera del lienzo
-      const canvas=imgEl.parentElement;
-      const cw=canvas.clientWidth, ch=canvas.clientHeight;
+      const canvasI=imgEl.parentElement;
+      const cw=canvasI.clientWidth, ch=canvasI.clientHeight;
       const maxX=Math.max(0,(imgEl.offsetWidth*zoom - cw)/2);
       const maxY=Math.max(0,(imgEl.offsetHeight*zoom - ch)/2);
       ix=Math.max(-maxX,Math.min(maxX,ix));
@@ -722,7 +1177,7 @@
       imgEl.style.transform='translate('+ix+'px,'+iy+'px) scale('+zoom+')';
     });
     document.addEventListener('mouseup',()=>{ if(ipanning){ ipanning=false; imgEl.style.cursor='grab'; } });
-    // PAN con un dedo (móvil) — y rueda para zoom hacia donde apunta
+    // PAN con un dedo (móvil)
     imgEl.addEventListener('touchstart',(e)=>{
       if(zoom<=1||e.touches.length!==1) return;
       ipanning=true; ipsx=e.touches[0].clientX; ipsy=e.touches[0].clientY; ipix=ix; ipiy=iy;
@@ -747,24 +1202,19 @@
       if(!w||!w.classList.contains('open')) return;
       w.classList.remove('open');
       mediaOpen=false;
-      bookEl.style.pointerEvents = (mz>1 && !isMobile) ? 'none' : '';
       if(id==='player'&&currentMedia){ currentMedia.pause(); currentMedia=null; playerArt.innerHTML=''; }
     }
     document.querySelectorAll('[data-close]').forEach(b=>{
       b.onclick=()=>{ closeWindow(b.dataset.close); };
     });
 
-    /* ---- cerrar al hacer clic/tap FUERA del reproductor abierto ----
-       Escritorio: el primer clic fuera SOLO cierra (no navega); el
-       siguiente clic ya voltea página. Móvil: cualquier tap fuera cierra.
-       Se usa la fase de captura y se detiene el evento para que ese primer
-       clic no llegue al libro. */
-    let suppressNextClick=false;   // el gesto que cierra no debe además navegar
+    /* ---- cerrar al hacer clic/tap FUERA del reproductor abierto ---- */
+    let suppressNextClick=false;
     function outsideCloser(ev){
       if(!mediaOpen) return;
       const openWin=document.querySelector('.ipod.open');
       if(!openWin) return;
-      if(openWin.contains(ev.target)) return;   // clic dentro del reproductor: ignorar
+      if(openWin.contains(ev.target)) return;
       ev.stopPropagation();
       ev.preventDefault();
       suppressNextClick=true;
@@ -772,9 +1222,6 @@
     }
     document.addEventListener('mousedown', outsideCloser, true);
     document.addEventListener('touchstart', outsideCloser, {capture:true, passive:false});
-    // Cancela el click/touchend que pertenece al mismo gesto de cierre.
-    // No se limpia la bandera de inmediato: se deja un instante para que
-    // también la ignore el listener de navegación por tap (fase burbuja).
     document.addEventListener('click',(ev)=>{
       if(suppressNextClick){ ev.stopPropagation(); ev.preventDefault(); setTimeout(()=>{suppressNextClick=false;},0); }
     }, true);
@@ -784,11 +1231,11 @@
 
     /* ---- centrar y arrastrar ventanas ---- */
     function centerWin(w){
-      if(isMobile) return;   // en móvil el CSS posiciona el reproductor
+      if(isMobile) return;
       w.style.left=(window.innerWidth/2-220)+'px'; w.style.top=(window.innerHeight/2-200)+'px';
     }
     function dragify(win,bar){
-      if(isMobile) return;   // sin arrastre en móvil
+      if(isMobile) return;
       let dx=0,dy=0,down=false;
       bar.addEventListener('mousedown',e=>{ if(e.target.closest('.closex'))return; down=true; dx=e.clientX-win.offsetLeft; dy=e.clientY-win.offsetTop; });
       document.addEventListener('mousemove',e=>{ if(down){ win.style.left=(e.clientX-dx)+'px'; win.style.top=(e.clientY-dy)+'px'; } });
@@ -797,136 +1244,34 @@
     dragify(player,document.getElementById('playerBar'));
     dragify(viewer,document.getElementById('viewerBar'));
 
-    /* =========================================================
-       ZOOM de la revista (rueda + pinch). Sin slider ni botones.
-       - Rueda del ratón / pellizco: acercan y alejan libremente, pero el
-         alejamiento nunca pasa del tamaño inicial (mz=1): ese es el piso,
-         no se puede "salir" de la vista normal haciendo zoom out de más.
-       - Doble clic: alterna entre 100% y 200%.
-       - Con zoom>1: arrastrar para desplazarse; el paso de página se bloquea.
-    ========================================================= */
-    const zoomLayer=document.getElementById('zoomLayer');
-    const MZMIN=1, MZMAX=4;
-    function applyMagZoom(){
-      zoomLayer.style.transform = mz===1 ? '' : `translate(${mx}px,${my}px) scale(${mz})`;
-      // mientras hay zoom, el libro no debe pasar página por gesto (escritorio Y móvil)
-      bookEl.style.pointerEvents = (mz>1) ? 'none' : '';
+    /* ---------- bucle de render ---------- */
+    function animar(){
+      libro.position.x += (offsetObjetivo - libro.position.x) * 0.08;
+      renderer.render(scene,camera);
+      requestAnimationFrame(animar);
     }
-    function clampPan(){
-      // evita alejar la revista demasiado de la vista
-      const lim=(mz-1)*Math.max(window.innerWidth,window.innerHeight)/2;
-      mx=Math.max(-lim,Math.min(lim,mx)); my=Math.max(-lim,Math.min(lim,my));
-    }
-    // rueda (escritorio)
-    document.addEventListener('wheel',(e)=>{
-      if(mediaOpen) return;
-      if(!e.ctrlKey && Math.abs(e.deltaY)<1) return;
-      e.preventDefault();
-      const prev=mz;
-      mz=Math.max(MZMIN,Math.min(MZMAX, mz - e.deltaY*0.002));
-      if(mz===prev) return;
-      if(mz===1){ mx=0;my=0; } else { clampPan(); }
-      applyMagZoom();
-    },{passive:false});
-    // arrastre para desplazar cuando hay zoom (escritorio)
-    let panning=false, psx=0,psy=0,pmx=0,pmy=0;
-    document.addEventListener('mousedown',(e)=>{
-      if(mz<=1||isMobile||mediaOpen) return;
-      if(e.target.closest('.ipod')) return;
-      panning=true; psx=e.clientX; psy=e.clientY; pmx=mx; pmy=my; e.preventDefault();
-    });
-    document.addEventListener('mousemove',(e)=>{
-      if(!panning) return;
-      mx=pmx+(e.clientX-psx); my=pmy+(e.clientY-psy); clampPan(); applyMagZoom();
-    });
-    document.addEventListener('mouseup',()=>{ panning=false; });
-    // doble clic alterna zoom
-    bookEl.addEventListener('dblclick',(e)=>{
-      if(mediaOpen) return;
-      mz = mz>1 ? 1 : 2;
-      mx=0; my=0; applyMagZoom();
-    });
-    // pinch + pan (móvil)
-    let pinchStart=0, pinchBase=1;
-    let tpanning=false, tsx=0,tsy=0,tmx=0,tmy=0;
-    document.addEventListener('touchstart',(e)=>{
-      if(mediaOpen) return;
-      if(e.target.closest && e.target.closest('.ipod')) return;
-      if(e.touches.length>=2){
-        bookEl.style.pointerEvents='none';
-        pinchStart=0;
-      } else if(e.touches.length===1 && mz>1){
-        tpanning=true; tsx=e.touches[0].clientX; tsy=e.touches[0].clientY; tmx=mx; tmy=my;
-      }
-    },{passive:true});
-    document.addEventListener('touchmove',(e)=>{
-      if(mediaOpen) return;
-      if(e.target.closest && e.target.closest('.ipod')) return;
-      if(e.touches.length>=2){
-        const dx=e.touches[0].clientX-e.touches[1].clientX;
-        const dy=e.touches[0].clientY-e.touches[1].clientY;
-        const dist=Math.hypot(dx,dy);
-        if(!pinchStart){ pinchStart=dist; pinchBase=mz; return; }
-        e.preventDefault();
-        mz=Math.max(MZMIN,Math.min(MZMAX, pinchBase*(dist/pinchStart)));
-        if(mz===1){mx=0;my=0;} else { clampPan(); } applyMagZoom();
-      } else if(e.touches.length===1 && tpanning && mz>1){
-        e.preventDefault();
-        mx=tmx+(e.touches[0].clientX-tsx); my=tmy+(e.touches[0].clientY-tsy);
-        clampPan(); applyMagZoom();
-      }
-    },{passive:false});
-    document.addEventListener('touchend',(e)=>{
-      if(e.touches.length<2){ pinchStart=0; }
-      if(e.touches.length===0){
-        tpanning=false;
-        bookEl.style.pointerEvents = (mz>1) ? 'none' : '';
-      }
-    });
-    // (En móvil el zoom es solo por pinch; el tap simple se reserva para pasar página.)
 
-    // ===== NAVEGACIÓN POR TAP (móvil) — a nivel documento, inmune al z-index =====
-    // Mitad izquierda = anterior, mitad derecha = siguiente.
-    // Prioridad: hotspot bajo el dedo > reproductor abierto > zoom > pasar página.
-    if(isMobile){
-      let gsx=0, gsy=0, gt=0, gmulti=false;
-      document.addEventListener('touchstart',(e)=>{
-        if(e.target.closest && e.target.closest('.ipod')) return;  // no tocar el reproductor
-        if(e.touches.length>1){ gmulti=true; return; }
-        gmulti=false;
-        gsx=e.touches[0].clientX; gsy=e.touches[0].clientY; gt=Date.now();
-      },{passive:true});
-      document.addEventListener('touchend',(e)=>{
-        if(e.target.closest && e.target.closest('.ipod')) return;  // el reproductor maneja lo suyo
-        if(gmulti){ gmulti=false; return; }
-        if(e.touches.length>0) return;
-        if(suppressNextClick) return;   // este tap cerró el reproductor, no navega
-        if(mediaOpen) return;
-        if(mz>1) return;                       // con zoom, el toque es para pan
-        const t1=e.changedTouches[0];
-        const moved=Math.hypot(t1.clientX-gsx, t1.clientY-gsy);
-        const W=window.innerWidth;
-        if(moved>=40 || Date.now()-gt>=600){ return; }
-        // ¿hotspot bajo el dedo? darle prioridad
-        const under=document.elementFromPoint(t1.clientX,t1.clientY);
-        const hsEl=under&&under.closest?under.closest('.hotspot'):null;
-        if(hsEl){ return; }
-        if(flipping){ return; }
-        const derecha = t1.clientX > W/2;
-        const idx = pageFlip.getCurrentPageIndex();
-        const total = pageFlip.getPageCount();
-        if(derecha){
-          if(idx < total-1){ pageFlip.flipNext(); }
-        } else {
-          if(idx > 0){
-            // flipPrev no siempre responde en portrait; turnToPage es el respaldo fiable
-            try{ pageFlip.flipPrev(); }catch(e){}
-            setTimeout(function(){
-              if(pageFlip.getCurrentPageIndex()===idx){ pageFlip.turnToPage(idx-1); }
-            },120);
-          }
+    construir();
+
+    // Ganchos mínimos para pruebas automatizadas (?test=1)
+    if(location.search.indexOf('test=1')>=0){
+      window.__rev = {
+        get volteadas(){ return volteadas; },
+        get hojas(){ return hojas.length; },
+        get mediaOpen(){ return mediaOpen; },
+        voltear,
+        worldToScreen(x,y){
+          const v=new THREE.Vector3(x + libro.position.x, y, 0).project(camera);
+          return { x:(v.x*0.5+0.5)*innerWidth, y:(-v.y*0.5+0.5)*innerHeight };
+        },
+        pagePointToScreen(pageIdx, xpct, ypct){
+          // pageIdx debe ser una de las dos páginas visibles del pliego actual
+          const derecha = (pageIdx % 2 === 0);
+          const lx = (derecha ? xpct/100 : xpct/100 - 1) * ANCHO_PAGINA;
+          const ly = ALTO_PAGINA/2 - (ypct/100)*ALTO_PAGINA;
+          return this.worldToScreen(lx, ly);
         }
-      });
+      };
     }
 
    } catch(err){ var b=document.getElementById('errbox'); b.style.display='block'; b.textContent='⚠ '+(err&&err.message?err.message:err); }
