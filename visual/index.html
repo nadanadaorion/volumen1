@@ -90,20 +90,6 @@
   /* lienzo 3D a pantalla completa; el fondo del body se ve a través (alpha) */
   #contenedor{ position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
 
-  /* barra de navegación inferior */
-  #ui{
-    position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
-    display:flex; gap:10px; align-items:center; z-index:900;
-    background:rgba(20,20,28,.65); padding:8px 12px; border-radius:10px;
-    box-shadow:0 4px 16px rgba(0,0,0,.35); backdrop-filter:blur(4px);
-  }
-  #ui button{
-    padding:8px 14px; border:1px solid rgba(230,200,120,.35); border-radius:6px;
-    background:rgba(255,255,255,.06); color:var(--accent); cursor:pointer; font-size:14px;
-  }
-  #ui button:hover:not(:disabled){ background:rgba(230,200,120,.18); }
-  #ui button:disabled{ opacity:.35; cursor:default; }
-
   /* ===================================================
      REPRODUCTOR estilo iPod / "Now Playing"
   =================================================== */
@@ -230,17 +216,11 @@
     .ipod .seekrow input[type=range]::-moz-range-thumb{ width:22px; height:22px; }
     .ipod .seekrow .barwrap .track,
     .ipod .seekrow .fill{ top:50%; transform:translateY(-50%); }
-    #ui{ bottom:10px; padding:6px 10px; }
-    #ui button{ padding:7px 12px; font-size:13px; }
   }
 </style>
 </head>
 <body>
   <canvas id="contenedor"></canvas>
-  <div id="ui">
-    <button id="btnPrev">◀</button>
-    <button id="btnNext">▶</button>
-  </div>
 
   <div id="seekdbg" style="display:none;position:fixed;left:0;right:0;bottom:0;max-height:32vh;overflow:auto;background:rgba(10,10,16,.92);color:#7CFC9A;font:11px/1.3 monospace;padding:6px 9px;z-index:99998;border-top:2px solid #2aa3ef"></div>
   <script>
@@ -384,8 +364,8 @@
     camera.position.set(0, 0.4, 13);
     camera.lookAt(0, 0, 0);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.85));
-    const luz = new THREE.DirectionalLight(0xffffff, 0.75);
+    scene.add(new THREE.AmbientLight(0xffffff, 2.2));
+    const luz = new THREE.DirectionalLight(0xffffff, 1.45);
     luz.position.set(-3.5, 15, 9);
     luz.shadow.mapSize.set(2048,2048);
     luz.shadow.radius = 7;
@@ -478,22 +458,36 @@
         this.grupo = new THREE.Group();
         this.grupo.add(this.mF); this.grupo.add(this.mD);
         this.angulo = 0;
+        this.esPrimera = false;   // portada: sin canal cuando la revista está cerrada
+        this.esUltima = false;    // contraportada: ídem
         this.deformar(0,0);
       }
 
       // Curvatura de reposo: canal que se hunde hacia el lomo.
       static zCanal(t){ return -0.55 * Math.pow(1 - t, 2.0); }
 
+      // Intensidad del canal según el ángulo: la portada cerrada (ang=0) y la
+      // contraportada cerrada (ang=PI) quedan PLANAS; el canal entra en rampa
+      // durante el volteo para no dar saltos.
+      factorCanal(ang){
+        const t = Math.max(0, Math.min(1, ang/Math.PI));
+        let c = 1;
+        if (this.esPrimera) c *= t;
+        if (this.esUltima)  c *= 1 - t;
+        return c;
+      }
+
       // Volteo completo: rota cada vértice alrededor del lomo.
       deformar(ang, curv){
         const pos = this.geo.attributes.position;
+        const canal = this.factorCanal(ang);
         for (let i=0;i<pos.count;i++){
           const d = this.baseX[i];
           const t = d / ANCHO_PAGINA;
           const X = Math.cos(ang) * d;
           let Z = Math.sin(ang) * d;
           Z += Math.sin(t*Math.PI) * curv;
-          Z += Hoja.zCanal(t);
+          Z += Hoja.zCanal(t) * canal;
           pos.setX(i, X);
           pos.setY(i, this.baseY[i]);
           pos.setZ(i, Z);
@@ -530,6 +524,7 @@
 
         const nx = dx / dist, ny = dy / dist;
         const Mx = (Cx + Tx) / 2, My = (Cy + Ty) / 2;
+        const canal = this.factorCanal(ang);
 
         for (let i=0;i<pos.count;i++){
           const d = this.baseX[i];
@@ -545,7 +540,7 @@
           } else {
             pos.setX(i, Xb);
             pos.setY(i, y);
-            pos.setZ(i, Hoja.zCanal(d / ANCHO_PAGINA));
+            pos.setZ(i, Hoja.zCanal(d / ANCHO_PAGINA) * canal);
           }
         }
         pos.needsUpdate = true;
@@ -558,9 +553,6 @@
     /* ============================================================
        LIBRO: construcción, apilado y volteo
     ============================================================ */
-    const btnPrev = document.getElementById('btnPrev');
-    const btnNext = document.getElementById('btnNext');
-
     let hojas = [];
     let volteadas = 0;      // nº de hojas ya pasadas (0 = cerrada en portada)
     let animando = false;
@@ -586,6 +578,10 @@
         const h = new Hoja(tex[i], tex[i+1]);
         libro.add(h.grupo);
         hojas.push(h);
+      }
+      if (hojas.length){
+        hojas[0].esPrimera = true;
+        hojas[hojas.length-1].esUltima = true;
       }
       reapilar();
       actualizarEstado();
@@ -616,8 +612,6 @@
 
     function actualizarEstado(){
       actualizarCentrado();
-      btnPrev.disabled = animando || volteadas === 0;
-      btnNext.disabled = animando || volteadas >= hojas.length;
     }
 
     function voltear(dir){
@@ -653,6 +647,7 @@
 
     // Prepara la visibilidad de las hojas del pliego para un vuelo en dirección dir.
     function prepararVuelo(dir){
+      ocultarResaltado();
       const volteadasDestino = volteadas + dir;
       hojas.forEach(x => x.grupo.visible = false);
       if (dir > 0){
@@ -679,9 +674,6 @@
       h.angulo = ang;
       h.grupo.position.z = 0.04;
     }
-
-    btnNext.addEventListener('click', ()=>voltear(+1));
-    btnPrev.addEventListener('click', ()=>voltear(-1));
 
     /* ============================================================
        HIT-TESTING: punto del cursor -> página y coordenadas %
@@ -727,15 +719,58 @@
     }
 
     // Hotspot de la página visible bajo el cursor (o null).
+    // Devuelve { hs, pg } para poder dibujar el resaltado sobre esa página.
     function hotspotBajoCursor(){
       const pt = puntoEnLibro();
       if (!pt) return null;
       const pg = paginaBajoPunto(pt);
       if (!pg) return null;
       for (const hs of (pg.page.hotspots||[])){
-        if (pg.xpct>=hs.x && pg.xpct<=hs.x+hs.w && pg.ypct>=hs.y && pg.ypct<=hs.y+hs.h) return hs;
+        if (pg.xpct>=hs.x && pg.xpct<=hs.x+hs.w && pg.ypct>=hs.y && pg.ypct<=hs.y+hs.h) return { hs, pg };
       }
       return null;
+    }
+
+    /* ---------- resaltado de hotspot (cuadro iluminado al pasar el cursor) ----------
+       Malla que copia la curvatura de la página en reposo, ligeramente por
+       encima, con relleno translúcido y borde en el color de acento. */
+    const hlMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(1,1),
+      new THREE.MeshBasicMaterial({ color:0xe6c878, transparent:true, opacity:0.2, depthTest:false, side:THREE.DoubleSide })
+    );
+    hlMesh.renderOrder = 10; hlMesh.visible = false;
+    const hlBorde = new THREE.LineSegments(
+      new THREE.EdgesGeometry(hlMesh.geometry, 15),
+      new THREE.LineBasicMaterial({ color:0xe6c878, transparent:true, opacity:0.9, depthTest:false })
+    );
+    hlBorde.renderOrder = 11; hlBorde.visible = false;
+    libro.add(hlMesh); libro.add(hlBorde);
+    let hlHs = null;
+
+    function mostrarResaltado(pg, hs){
+      if (hlHs === hs && hlMesh.visible) return;
+      hlHs = hs;
+      const derecha = (pg.pageIdx % 2 === 0);
+      const x0 = (derecha ? hs.x/100 : hs.x/100 - 1) * ANCHO_PAGINA;
+      const x1 = (derecha ? (hs.x+hs.w)/100 : (hs.x+hs.w)/100 - 1) * ANCHO_PAGINA;
+      const yT = ALTO_PAGINA/2 - (hs.y/100)*ALTO_PAGINA;
+      const yB = ALTO_PAGINA/2 - ((hs.y+hs.h)/100)*ALTO_PAGINA;
+      const geo = new THREE.PlaneGeometry(x1-x0, yT-yB, 16, 1);
+      geo.translate((x0+x1)/2, (yT+yB)/2, 0);
+      // seguir el canal del lomo de la página en reposo
+      const hoja = derecha ? hojas[volteadas] : hojas[volteadas-1];
+      const canal = hoja ? hoja.factorCanal(derecha ? 0 : Math.PI) : 1;
+      const p = geo.attributes.position;
+      for (let i=0;i<p.count;i++){
+        const t = Math.abs(p.getX(i)) / ANCHO_PAGINA;
+        p.setZ(i, Hoja.zCanal(t)*canal + 0.02);
+      }
+      hlMesh.geometry.dispose(); hlMesh.geometry = geo;
+      hlBorde.geometry.dispose(); hlBorde.geometry = new THREE.EdgesGeometry(geo, 15);
+      hlMesh.visible = true; hlBorde.visible = true;
+    }
+    function ocultarResaltado(){
+      hlMesh.visible = false; hlBorde.visible = false; hlHs = null;
     }
 
     // Activa un hotspot: enlace externo o reproductor/visor.
@@ -865,12 +900,14 @@
       }
       if (animando) return;
       // Hotspot bajo el cursor: prioridad sobre el pliegue de esquina.
-      const hs = hotspotBajoCursor();
-      if (hs){
+      const hit = hotspotBajoCursor();
+      if (hit){
         canvas.style.cursor = 'pointer';
+        mostrarResaltado(hit.pg, hit.hs);
         limpiarPreview();
         return;
       }
+      ocultarResaltado();
       const c = esquinaBajoCursor();
       if (c){
         cancelarDesdoble();
@@ -913,7 +950,7 @@
       }
       cancelarDesdoble();
       if (pliegue){ pliegue.h.plano(); pliegue.h.grupo.position.z = 0; pliegue = null; }
-      hojaPreview = null; ocultarDebajo();
+      hojaPreview = null; ocultarDebajo(); ocultarResaltado();
       arrastrando = true; animando = true;
       dirArrastre = c.dir; hojaArrastre = c.h; esquinaYArrastre = c.esquinaY;
       prepararVuelo(c.dir);
@@ -967,8 +1004,8 @@
       if (panMovio){ panMovio=false; return; }
       if (Math.hypot(ev.clientX - downX, ev.clientY - downY) >= 8) return;
       actualizarNDC(ev.clientX, ev.clientY);
-      const hs = hotspotBajoCursor();
-      if (hs){ fireHotspot(hs); return; }
+      const hit = hotspotBajoCursor();
+      if (hit){ fireHotspot(hit.hs); return; }
       // clic sobre la portada cerrada: abrir la revista
       if (volteadas===0 && puntoEnLibro()) voltear(+1);
     });
@@ -1043,8 +1080,8 @@
       // evita los eventos de mouse sintéticos del tap (doble disparo)
       if (e.cancelable) e.preventDefault();
       // prioridad: hotspot bajo el dedo
-      const hs = hotspotBajoCursor();
-      if (hs){ fireHotspot(hs); return; }
+      const hit = hotspotBajoCursor();
+      if (hit){ fireHotspot(hit.hs); return; }
       if (zoomF<1) return;              // con zoom, el toque es para pan
       // mitad izquierda = anterior, mitad derecha = siguiente
       if (t1.clientX > window.innerWidth/2) voltear(+1);
@@ -1247,6 +1284,10 @@
     /* ---------- bucle de render ---------- */
     function animar(){
       libro.position.x += (offsetObjetivo - libro.position.x) * 0.08;
+      // pulso suave del resaltado de hotspot
+      if (hlMesh.visible){
+        hlMesh.material.opacity = 0.16 + 0.08 * (0.5 + 0.5*Math.sin(performance.now()/280));
+      }
       renderer.render(scene,camera);
       requestAnimationFrame(animar);
     }
@@ -1259,6 +1300,7 @@
         get volteadas(){ return volteadas; },
         get hojas(){ return hojas.length; },
         get mediaOpen(){ return mediaOpen; },
+        get resaltado(){ return hlMesh.visible; },
         voltear,
         worldToScreen(x,y){
           const v=new THREE.Vector3(x + libro.position.x, y, 0).project(camera);
