@@ -676,6 +676,7 @@
     // mismo plano, la página de atrás se ve un instante antes de la animación.
     function prepararVuelo(dir){
       ocultarResaltado();
+      limpiarEstadoPeel();
       const volteadasDestino = volteadas + dir;
       hojas.forEach(x => x.grupo.visible = false);
       if (dir > 0){
@@ -904,6 +905,18 @@
 
     function limpiarPreview(){ desdoblarSuave(); hojaPreview = null; }
 
+    // Limpieza TOTAL del estado del pliegue de esquina. Debe ejecutarse antes
+    // de iniciar cualquier volteo: si un desdoble suave sigue vivo cuando el
+    // volteo cambia `volteadas`, su paso final oculta la "hoja de debajo"
+    // (ocultarDebajo) que para entonces ya es una página del pliego visible,
+    // y la página desaparece hasta el siguiente reapilado.
+    function limpiarEstadoPeel(){
+      cancelarDesdoble();
+      if (pliegue){ pliegue.h.plano(); pliegue.h.grupo.position.z = 0; pliegue = null; }
+      hojaPreview = null;
+      ocultarDebajo();
+    }
+
     /* ---------- pan de cámara con zoom (escritorio) ---------- */
     let paneando=false, panSX=0, panSY=0, panBX=0, panBY=0, panMovio=false;
 
@@ -976,9 +989,7 @@
         }
         return;
       }
-      cancelarDesdoble();
-      if (pliegue){ pliegue.h.plano(); pliegue.h.grupo.position.z = 0; pliegue = null; }
-      hojaPreview = null; ocultarDebajo(); ocultarResaltado();
+      limpiarEstadoPeel(); ocultarResaltado();
       arrastrando = true; animando = true;
       dirArrastre = c.dir; hojaArrastre = c.h; esquinaYArrastre = c.esquinaY;
       prepararVuelo(c.dir);
@@ -1336,6 +1347,7 @@
         get mediaOpen(){ return mediaOpen; },
         get resaltado(){ return hlMesh.visible; },
         get paginaActual(){ return paginaActual; },
+        get visibles(){ return hojas.map(h=>h.grupo.visible); },
         voltear, irPagina,
         worldToScreen(x,y){
           const v=new THREE.Vector3(x + libro.position.x, y, 0).project(camera);
