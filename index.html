@@ -375,16 +375,21 @@
     scene.add(luz);
 
     /* ---------- Cámara: encuadre + zoom ---------- */
-    let fitDist = 13;      // distancia a la que el libro abierto cabe en pantalla
+    // En MÓVIL la cámara encuadra UNA sola página (paginaActual) en vez del
+    // pliego doble: baseCamX apunta al centro de la página visible y se
+    // desliza suavemente entre la izquierda y la derecha del pliego.
+    let fitDist = 13;      // distancia a la que el contenido cabe en pantalla
     let zoomF = 1;         // 1 = encuadre completo; <1 = acercado
     let camPanX = 0, camPanY = 0;
+    let baseCamX = 0, baseCamObjetivo = 0;
+    if (isMobile){ baseCamX = baseCamObjetivo = ANCHO_PAGINA/2; }
     const ZMIN = 0.3;
     function aplicarCamara(){
       const lim = (1 - zoomF) * ANCHO_PAGINA * 2;
       camPanX = Math.max(-lim, Math.min(lim, camPanX));
       camPanY = Math.max(-lim, Math.min(lim, camPanY));
       if(zoomF>=1){ camPanX=0; camPanY=0; }
-      camera.position.x = camPanX;
+      camera.position.x = baseCamX + camPanX;
       camera.position.y = 0.4 + camPanY;
       camera.position.z = fitDist * zoomF;
     }
@@ -393,9 +398,11 @@
       renderer.setSize(w,h,false);
       camera.aspect=w/h; camera.updateProjectionMatrix();
       const fov = camera.fov*Math.PI/180;
-      const margen = 1.12;
+      const margen = isMobile ? 1.04 : 1.12;
+      // móvil: encuadrar una página (medio pliego); escritorio: el pliego entero
+      const semiAncho = (isMobile ? ANCHO_PAGINA/2 : ANCHO_PAGINA) * margen;
       const distAlto  = (ALTO_PAGINA/2*margen)/Math.tan(fov/2);
-      const distAncho = (ANCHO_PAGINA*margen)/(Math.tan(fov/2)*camera.aspect);
+      const distAncho = semiAncho/(Math.tan(fov/2)*camera.aspect);
       fitDist = Math.max(distAlto, distAncho);
       aplicarCamara();
     }
@@ -564,9 +571,27 @@
     scene.add(libro);
     let offsetObjetivo = 0;
     function actualizarCentrado(){
+      if (isMobile){ offsetObjetivo = 0; return; }   // en móvil centra la cámara, no el libro
       if (volteadas === 0)                offsetObjetivo = -ANCHO_PAGINA/2;
       else if (volteadas >= hojas.length) offsetObjetivo =  ANCHO_PAGINA/2;
       else                                offsetObjetivo = 0;
+    }
+
+    /* ---------- MÓVIL: navegación de página en página ----------
+       paginaActual (0..n-1) es la página que se ve a pantalla completa.
+       Página par = lado derecho del pliego, impar = lado izquierdo.
+       Avanzar desde una par (o retroceder desde una impar) cruza la hoja:
+       animación de volteo. En el otro caso solo se desliza la cámara. */
+    let paginaActual = 0;
+    function irPagina(dir){
+      if (animando) return;
+      if (mediaOpen) return;
+      const destino = paginaActual + dir;
+      if (destino < 0 || destino >= DATA.pages.length) return;
+      const esPar = paginaActual % 2 === 0;
+      if ((dir > 0 && esPar) || (dir < 0 && !esPar)) voltear(dir);
+      paginaActual = destino;
+      baseCamObjetivo = (paginaActual % 2 === 0 ? 1 : -1) * ANCHO_PAGINA/2;
     }
 
     async function construir(){
@@ -646,24 +671,27 @@
     }
 
     // Prepara la visibilidad de las hojas del pliego para un vuelo en dirección dir.
+    // La hoja que se REVELA queda ligeramente detrás (-z) y la hoja que vuela
+    // ligeramente delante (+z) DESDE EL PRIMER FRAME: si ambas quedaran en el
+    // mismo plano, la página de atrás se ve un instante antes de la animación.
     function prepararVuelo(dir){
       ocultarResaltado();
       const volteadasDestino = volteadas + dir;
       hojas.forEach(x => x.grupo.visible = false);
       if (dir > 0){
         const der = hojas[volteadasDestino];
-        if (der){ der.grupo.visible = true; der.deformar(0,0); der.angulo=0; der.grupo.position.z = 0; }
+        if (der){ der.grupo.visible = true; der.deformar(0,0); der.angulo=0; der.grupo.position.z = -0.02; }
         const izqOrigen = hojas[volteadas - 1];
         if (izqOrigen){ izqOrigen.grupo.visible = true; izqOrigen.deformar(Math.PI,0); izqOrigen.angulo=Math.PI; izqOrigen.grupo.position.z = 0; }
       } else {
         const izq = hojas[volteadasDestino - 1];
-        if (izq){ izq.grupo.visible = true; izq.deformar(Math.PI,0); izq.angulo=Math.PI; izq.grupo.position.z = 0; }
+        if (izq){ izq.grupo.visible = true; izq.deformar(Math.PI,0); izq.angulo=Math.PI; izq.grupo.position.z = -0.02; }
         const derOrigen = hojas[volteadas];
         if (derOrigen){ derOrigen.grupo.visible = true; derOrigen.deformar(0,0); derOrigen.angulo=0; derOrigen.grupo.position.z = 0; }
       }
       const idx = dir > 0 ? volteadas : volteadas - 1;
       const h = hojas[idx];
-      if (h) h.grupo.visible = true;
+      if (h){ h.grupo.visible = true; h.grupo.position.z = 0.04; }
     }
 
     // Aplica un ángulo intermedio a la hoja h con el bombeo proporcional.
@@ -1084,8 +1112,9 @@
       if (hit){ fireHotspot(hit.hs); return; }
       if (zoomF<1) return;              // con zoom, el toque es para pan
       // mitad izquierda = anterior, mitad derecha = siguiente
-      if (t1.clientX > window.innerWidth/2) voltear(+1);
-      else voltear(-1);
+      const dir = t1.clientX > window.innerWidth/2 ? +1 : -1;
+      if (isMobile) irPagina(dir);      // móvil: de página en página
+      else voltear(dir);                // escritorio táctil: pliego completo
     });
 
     /* =========================================================
@@ -1284,6 +1313,11 @@
     /* ---------- bucle de render ---------- */
     function animar(){
       libro.position.x += (offsetObjetivo - libro.position.x) * 0.08;
+      // deslizamiento de la cámara entre páginas (móvil)
+      if (Math.abs(baseCamObjetivo - baseCamX) > 0.0005){
+        baseCamX += (baseCamObjetivo - baseCamX) * 0.1;
+        aplicarCamara();
+      }
       // pulso suave del resaltado de hotspot
       if (hlMesh.visible){
         hlMesh.material.opacity = 0.16 + 0.08 * (0.5 + 0.5*Math.sin(performance.now()/280));
@@ -1301,7 +1335,8 @@
         get hojas(){ return hojas.length; },
         get mediaOpen(){ return mediaOpen; },
         get resaltado(){ return hlMesh.visible; },
-        voltear,
+        get paginaActual(){ return paginaActual; },
+        voltear, irPagina,
         worldToScreen(x,y){
           const v=new THREE.Vector3(x + libro.position.x, y, 0).project(camera);
           return { x:(v.x*0.5+0.5)*innerWidth, y:(-v.y*0.5+0.5)*innerHeight };
