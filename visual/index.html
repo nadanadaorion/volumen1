@@ -374,38 +374,33 @@
     luz.shadow.camera.top=10; luz.shadow.camera.bottom=-10;
     scene.add(luz);
 
-    /* ---------- Entorno de estudio (reflejos plastificados) ----------
-       Genera por código un mapa equirectangular con el suelo/techo en
-       degradado y varias "softboxes" luminosas. El clearcoat de las hojas
-       refleja este entorno: al curvarse durante el volteo, los reflejos se
-       deslizan sobre la página como en una revista real. Sin archivos
-       externos: todo se dibuja en un canvas y se procesa con PMREM. */
-    (function crearEntornoEstudio(){
+    /* ---------- Entorno de laminado (reflejo limpio, sin lavar los negros) ----------
+       Clave: el entorno es MAYORMENTE OSCURO con UNA banda de luz suave en
+       la franja superior. Así una hoja plana refleja lo oscuro (los negros
+       siguen siendo negros, sin "velo de luminancia") y solo al CURVARSE
+       capta la banda -> aparece el barrido de brillo del laminado, como en
+       un acetato real. El clearcoat lo refleja; PMREM lo difumina. La
+       iluminación de la página viene de las luces, no del entorno. */
+    (function crearEntornoLaminado(){
       const W=1024, H=512;
       const c=document.createElement('canvas'); c.width=W; c.height=H;
       const g=c.getContext('2d');
-      // cielo/techo claro arriba, suelo más oscuro abajo (neutro, algo frío)
-      const grad=g.createLinearGradient(0,0,0,H);
-      grad.addColorStop(0.00,'#eef2f7');
-      grad.addColorStop(0.45,'#d3d9e0');
-      grad.addColorStop(0.55,'#b7bdc5');
-      grad.addColorStop(1.00,'#585c63');
-      g.fillStyle=grad; g.fillRect(0,0,W,H);
-      // softboxes: manchas blancas suaves en la banda superior (frente/arriba),
-      // repartidas en azimut para que el reflejo barra la hoja al voltear.
-      function softbox(cx,cy,rx,ry,inten){
+      // base oscura: reflejo neutro y tenue en las zonas planas
+      g.fillStyle='#1b1d22'; g.fillRect(0,0,W,H);
+      // Banda de luz suave y ancha en la franja SUPERIOR (por encima del
+      // horizonte): la hoja plana refleja el horizonte oscuro; al curvarse,
+      // su normal apunta hacia arriba y capta esta banda.
+      function banda(cx,cy,rx,ry,inten){
         g.save(); g.translate(cx,cy); g.scale(rx,ry);
         const rg=g.createRadialGradient(0,0,0,0,0,1);
         rg.addColorStop(0,'rgba(255,255,255,'+inten+')');
-        rg.addColorStop(0.6,'rgba(255,255,255,'+(inten*0.35)+')');
+        rg.addColorStop(0.55,'rgba(255,255,255,'+(inten*0.45)+')');
         rg.addColorStop(1,'rgba(255,255,255,0)');
         g.fillStyle=rg; g.beginPath(); g.arc(0,0,1,0,Math.PI*2); g.fill();
         g.restore();
       }
-      softbox(W*0.30, H*0.26, 150, 90, 0.95);
-      softbox(W*0.62, H*0.22, 190, 70, 0.90);
-      softbox(W*0.82, H*0.32, 120, 80, 0.70);
-      softbox(W*0.14, H*0.34, 110, 70, 0.65);
+      banda(W*0.50, H*0.20, 380, 95, 0.95);   // banda principal, amplia
+      banda(W*0.50, H*0.09, 300, 55, 0.55);   // realce superior
       const envTex=new THREE.Texture(c);
       envTex.mapping=THREE.EquirectangularReflectionMapping;
       envTex.colorSpace=THREE.SRGBColorSpace;
@@ -497,12 +492,12 @@
         // El equilibrio reflectante/opaco lo dan envMapIntensity y la rugosidad
         // del clearcoat: nítido pero sin llegar a espejo.
         const matF = new THREE.MeshPhysicalMaterial({
-          map:texFrente, roughness:.55, metalness:0,
-          clearcoat:1.0, clearcoatRoughness:.13, envMapIntensity:.55,
+          map:texFrente, roughness:.6, metalness:0,
+          clearcoat:1.0, clearcoatRoughness:.28, envMapIntensity:.4,
           side:THREE.FrontSide });
         const matD = new THREE.MeshPhysicalMaterial({
-          map:texDorso, roughness:.55, metalness:0,
-          clearcoat:1.0, clearcoatRoughness:.13, envMapIntensity:.55,
+          map:texDorso, roughness:.6, metalness:0,
+          clearcoat:1.0, clearcoatRoughness:.28, envMapIntensity:.4,
           side:THREE.BackSide });
 
         this.geo = geo;
