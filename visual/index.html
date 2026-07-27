@@ -1533,9 +1533,10 @@
       if (hlMesh.visible){
         hlMesh.material.opacity = 0.16 + 0.08 * (0.5 + 0.5*Math.sin(performance.now()/280));
       }
-      // El fondo (bgScene) se pinta primero y el libro encima; así el VHS
-      // afecta a TODA la página, fondo incluido.
       if (vhsOn){
+        // VHS ON: se pinta el fondo dentro de WebGL y el libro encima, todo a
+        // un render target, y el shader VHS procesa TODA la página (fondo
+        // incluido). El canvas queda opaco y tapa el fondo CSS.
         postMat.uniforms.uTime.value = performance.now()/1000;
         renderer.setRenderTarget(rt);
         renderer.autoClear = true;  renderer.render(bgScene, bgCam);
@@ -1544,10 +1545,11 @@
         renderer.setRenderTarget(null);
         renderer.render(postScene, postCam);
       } else {
+        // VHS OFF: canvas TRANSPARENTE, solo el libro. El fondo lo pinta el
+        // navegador por CSS igual que siempre, sin pasar por la gestión de
+        // color de WebGL -> los colores del fondo quedan idénticos al original.
         renderer.setRenderTarget(null);
-        renderer.autoClear = true;  renderer.render(bgScene, bgCam);
-        renderer.autoClear = false; renderer.render(scene, camera);
-        renderer.autoClear = true;
+        renderer.render(scene, camera);
       }
       requestAnimationFrame(animar);
     }
