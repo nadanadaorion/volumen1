@@ -219,59 +219,47 @@
   }
 
   /* ===================================================
-     OVERLAY VHS  ·  capa sobre toda la página (bajo los
-     reproductores para no estorbar sus controles).
-     El shader WebGL aporta la aberración cromática y la
-     ondulación de la señal sobre la revista; esta capa
-     aporta líneas de escaneo, grano, viñeta, parpadeo y
-     la barra de "tracking" sobre TODO el viewport.
-     Se puede alternar con la tecla V (body.no-vhs).
+     OVERLAY VIDEOCÁMARA  ·  capa sobre toda la página
+     (bajo los reproductores). El shader WebGL aporta la
+     sobre-nitidez, saturación y ruido de sensor; esta capa
+     aporta el ENTRELAZADO fino, grano tenue, viñeta y el
+     HUD "REC ● / fecha" típico de una camcorder digital.
+     Se alterna con la tecla V (body.no-vhs).
   =================================================== */
-  #vhs{
-    position:fixed; inset:0; z-index:900; pointer-events:none;
-    /* grano: turbulencia SVG embebida (sin archivos externos) */
-    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.5'/></svg>");
-    background-size:140px 140px;
-    opacity:.10; mix-blend-mode:overlay;
-    animation:vhsGrain .6s steps(3) infinite, vhsFlick 4.7s ease-in-out infinite;
+  #vhs{ position:fixed; inset:0; z-index:900; pointer-events:none; }
+  #vhs .cam-grain{  /* grano de sensor: turbulencia SVG embebida (sin archivos) */
+    position:absolute; inset:0;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='0.5'/></svg>");
+    background-size:120px 120px;
+    opacity:.06; mix-blend-mode:overlay;
+    animation:vhsGrain .5s steps(3) infinite;
   }
-  #vhs::before{  /* líneas de escaneo */
+  #vhs::before{  /* entrelazado fino de vídeo (líneas de 1px) */
     content:""; position:absolute; inset:0;
     background:repeating-linear-gradient(to bottom,
-      rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px,
-      rgba(0,0,0,.14) 3px, rgba(0,0,0,0) 4px);
-    mix-blend-mode:multiply;
+      rgba(0,0,0,.10) 0px, rgba(0,0,0,.10) 1px,
+      rgba(0,0,0,0) 1px, rgba(0,0,0,0) 2px);
+    mix-blend-mode:multiply; opacity:.55;
   }
-  #vhs::after{  /* viñeta + tinte frío de tubo */
+  #vhs::after{  /* viñeta suave */
     content:""; position:absolute; inset:0;
-    background:
-      radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.42) 100%),
-      linear-gradient(rgba(80,120,140,.05), rgba(80,120,140,.05));
-  }
-  #vhs .vhs-bar{  /* barra de tracking que rueda lentamente */
-    position:absolute; left:0; right:0; top:-120px; height:120px;
-    background:linear-gradient(to bottom,
-      rgba(255,255,255,0) 0%, rgba(255,255,255,.045) 45%,
-      rgba(255,255,255,.075) 50%, rgba(255,255,255,.045) 55%,
-      rgba(255,255,255,0) 100%);
-    animation:vhsRoll 9s linear infinite;
+    background:radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(0,0,0,.34) 100%);
   }
   @keyframes vhsGrain{
-    0%{ background-position:0 0; } 33%{ background-position:-60px 30px; }
-    66%{ background-position:40px -50px; } 100%{ background-position:-30px 20px; }
+    0%{ background-position:0 0; } 33%{ background-position:-40px 25px; }
+    66%{ background-position:35px -35px; } 100%{ background-position:-20px 15px; }
   }
-  @keyframes vhsFlick{ 0%,100%{ opacity:.10; } 45%{ opacity:.075; } 55%{ opacity:.13; } }
-  @keyframes vhsRoll{ from{ transform:translateY(0); } to{ transform:translateY(115vh); } }
   body.no-vhs #vhs{ display:none; }
   @media (prefers-reduced-motion: reduce){
-    #vhs{ animation:none; }
-    #vhs .vhs-bar{ display:none; }
+    #vhs .cam-grain{ animation:none; }
   }
 </style>
 </head>
 <body>
   <canvas id="contenedor"></canvas>
-  <div id="vhs" aria-hidden="true"><div class="vhs-bar"></div></div>
+  <div id="vhs" aria-hidden="true">
+    <div class="cam-grain"></div>
+  </div>
 
   <div id="seekdbg" style="display:none;position:fixed;left:0;right:0;bottom:0;max-height:32vh;overflow:auto;background:rgba(10,10,16,.92);color:#7CFC9A;font:11px/1.3 monospace;padding:6px 9px;z-index:99998;border-top:2px solid #2aa3ef"></div>
   <script>
@@ -463,12 +451,13 @@
     })();
 
     /* ============================================================
-       POST-PROCESO VHS (shader sobre la revista)
+       POST-PROCESO VIDEOCÁMARA (shader sobre la escena)
        Renderiza la escena a un render target y luego dibuja un quad a
-       pantalla completa con un shader que aplica: ondulación de señal,
-       aberración cromática (más fuerte hacia los bordes), saltos de
-       tracking y grano. Conserva el alfa, así el fondo (CSS) sigue
-       viéndose. Las líneas de escaneo/viñeta las pone la capa CSS #vhs.
+       pantalla completa con un shader que aplica el look de camcorder
+       digital de principios de los 2000: NÍTIDO (realce de bordes marcado),
+       saturación y contraste subidos y ruido de sensor fino. Sin aberración
+       cromática ni ondulación. Conserva el alfa. El entrelazado/viñeta/grano
+       los pone la capa CSS #vhs. Se alterna con la tecla V.
     ============================================================ */
     renderer.setClearColor(0x000000, 0);
     let vhsOn = false;                 // apagado por defecto; se alterna con V
@@ -489,38 +478,42 @@
         tDiffuse: { value: rt.texture },
         uTime:    { value: 0 },
         uRes:     { value: new THREE.Vector2(2, 2) },
+        uTexel:   { value: new THREE.Vector2(0.001, 0.001) },
         uAmount:  { value: 1.0 }
       },
       vertexShader: `
         varying vec2 vUv;
         void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
       `,
+      // ---- Look de VIDEOCÁMARA DIGITAL (principios 2000s) ----
+      // NÍTIDO: nada de aberración cromática ni ondulación. En su lugar:
+      // realce de bordes (edge enhancement típico de las camcorders),
+      // ligero empuje de saturación/contraste y ruido de sensor fino.
       fragmentShader: `
         precision highp float;
-        uniform sampler2D tDiffuse; uniform float uTime; uniform vec2 uRes; uniform float uAmount;
+        uniform sampler2D tDiffuse; uniform float uTime; uniform vec2 uRes; uniform vec2 uTexel; uniform float uAmount;
         varying vec2 vUv;
         float rand(vec2 c){ return fract(sin(dot(c, vec2(12.9898,78.233)))*43758.5453); }
         void main(){
-          vec2 uv = vUv;
-          // ondulación horizontal de la señal (dos frecuencias)
-          float wob = sin(uv.y*130.0 + uTime*5.0)*0.0006
-                    + sin(uv.y*17.0  - uTime*1.3)*0.0011;
-          uv.x += wob * uAmount;
-          // salto ocasional de tracking en bandas horizontales
-          float tr = step(0.996, rand(vec2(floor(uTime*10.0), floor(uv.y*18.0))));
-          uv.x += tr * 0.012 * uAmount;
-          // aberración cromática, mayor hacia los bordes
-          vec2 d = uv - 0.5;
-          float ca = (0.0016 + dot(d,d)*0.012) * uAmount;
-          vec4 cr = texture2D(tDiffuse, uv + vec2(ca, 0.0));
-          vec4 cg = texture2D(tDiffuse, uv);
-          vec4 cb = texture2D(tDiffuse, uv - vec2(ca, 0.0));
-          float a = max(cg.a, max(cr.a, cb.a));
-          vec3 col = vec3(cr.r, cg.g, cb.b);
-          // grano fino
-          float n = (rand(uv*uRes*0.5 + fract(uTime))-0.5) * 0.05 * uAmount;
+          vec4 c = texture2D(tDiffuse, vUv);
+          // Realce de bordes (unsharp mask): centro menos el promedio de los
+          // 4 vecinos -> aristas más marcadas, sensación de "sobre-nitidez".
+          vec3 blur = (
+            texture2D(tDiffuse, vUv + vec2( uTexel.x, 0.0)).rgb +
+            texture2D(tDiffuse, vUv + vec2(-uTexel.x, 0.0)).rgb +
+            texture2D(tDiffuse, vUv + vec2(0.0,  uTexel.y)).rgb +
+            texture2D(tDiffuse, vUv + vec2(0.0, -uTexel.y)).rgb
+          ) * 0.25;
+          vec3 col = c.rgb + (c.rgb - blur) * (1.6 * uAmount);   // realce marcado
+          // Saturación y contraste (look de sensor de consumo, más agresivo)
+          float l = dot(col, vec3(0.299, 0.587, 0.114));
+          col = mix(vec3(l), col, 1.0 + 0.22*uAmount);           // saturación
+          col = (col - 0.5) * (1.0 + 0.20*uAmount) + 0.5;        // contraste
+          // Ruido de sensor fino (más visible en zonas oscuras)
+          float lum = dot(col, vec3(0.299,0.587,0.114));
+          float n = (rand(vUv*uRes + fract(uTime)) - 0.5) * 0.05 * uAmount * (1.2 - lum);
           col += n;
-          gl_FragColor = vec4(col, a);
+          gl_FragColor = vec4(clamp(col, 0.0, 1.0), c.a);
         }
       `
     });
@@ -529,6 +522,7 @@
       const bs = renderer.getDrawingBufferSize(new THREE.Vector2());
       rt.setSize(Math.max(2, bs.x), Math.max(2, bs.y));
       postMat.uniforms.uRes.value.set(w, h);
+      postMat.uniforms.uTexel.value.set(1/Math.max(2, bs.x), 1/Math.max(2, bs.y));
       if (bgMat && bgMat.uniforms && bgMat.uniforms.uScreen) bgMat.uniforms.uScreen.value.set(w, h);
     }
 
@@ -1554,7 +1548,7 @@
       requestAnimationFrame(animar);
     }
 
-    /* ---------- alternar VHS con la tecla V ---------- */
+    /* ---------- alternar efecto videocámara con la tecla V ---------- */
     window.addEventListener('keydown',(e)=>{
       if(e.key==='v' || e.key==='V'){
         vhsOn = !vhsOn;
